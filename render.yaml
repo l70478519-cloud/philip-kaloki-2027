@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: philip-kaloki-campaign-website
+    name: philip-kaloki-2027
     runtime: static
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist

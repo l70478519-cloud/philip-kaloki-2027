@@ -1,5 +1,5 @@
 {
-  "name": "philip-kaloki-professional-website",
+  "name": "philip-kaloki-2027",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -14,7 +14,6 @@
     "typescript": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "react-router-dom": "latest",
     "lucide-react": "latest"
   },
   "devDependencies": {
