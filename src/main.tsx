@@ -141,6 +141,26 @@ function useLiveApi<T>(url: string, fallback: T) {
 
 type Submission = Record<string, string> & { id: string; type: string; createdAt: string; status: string }
 
+
+type ChatThread = {
+  id: string
+  visitor_name: string
+  visitor_phone: string
+  visitor_email?: string
+  status: 'open'|'closed'
+  unread_count?: number
+  created_at?: string
+  updated_at?: string
+}
+
+type ChatMessage = {
+  id: string
+  thread_id: string
+  sender: 'visitor'|'admin'
+  message: string
+  created_at?: string
+}
+
 const fallbackContent: Content = {
   candidateName: 'Prof. Philip Kaloki', campaignTitle: 'Makueni County • 2027', tagline: 'Development. Integrity. Prosperity.',
   strapline: 'Leadership that listens. Development that reaches every household.', phone: '+254 700 000 000',
@@ -256,6 +276,127 @@ function CandidateReminder({ content }: { content: Content }) {
       <a href="/agenda">View the development agenda <ArrowRight size={15}/></a>
     </div>
   </aside>
+}
+
+
+function CampaignChatWidget({ content }: { content: Content }) {
+  const [open,setOpen]=React.useState(false)
+  const [threadId,setThreadId]=React.useState(()=>localStorage.getItem('campaignChatThread')||'')
+  const [messages,setMessages]=React.useState<ChatMessage[]>([])
+  const [name,setName]=React.useState(()=>localStorage.getItem('campaignChatName')||'')
+  const [phone,setPhone]=React.useState(()=>localStorage.getItem('campaignChatPhone')||'')
+  const [email,setEmail]=React.useState(()=>localStorage.getItem('campaignChatEmail')||'')
+  const [draft,setDraft]=React.useState('')
+  const [busy,setBusy]=React.useState(false)
+  const [error,setError]=React.useState('')
+
+  const loadMessages=React.useCallback(async()=>{
+    if(!threadId)return
+    const r=await fetch(`/api/chat/${encodeURIComponent(threadId)}`)
+    if(r.ok){
+      const data=await r.json()
+      setMessages(Array.isArray(data.messages)?data.messages:[])
+    }
+  },[threadId])
+
+  React.useEffect(()=>{
+    if(!open||!threadId)return
+    loadMessages()
+    const timer=window.setInterval(loadMessages,5000)
+    return()=>window.clearInterval(timer)
+  },[open,threadId,loadMessages])
+
+  const startChat=async(e:React.FormEvent<HTMLFormElement>)=>{
+    e.preventDefault()
+    if(!name.trim()||!phone.trim())return
+    setBusy(true);setError('')
+    try{
+      const r=await fetch('/api/chat/start',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({name:name.trim(),phone:phone.trim(),email:email.trim()})
+      })
+      const data=await r.json()
+      if(!r.ok)throw new Error(data.error||'Could not start chat.')
+      setThreadId(data.thread.id)
+      localStorage.setItem('campaignChatThread',data.thread.id)
+      localStorage.setItem('campaignChatName',name.trim())
+      localStorage.setItem('campaignChatPhone',phone.trim())
+      localStorage.setItem('campaignChatEmail',email.trim())
+      setMessages(data.messages||[])
+    }catch(err){
+      setError(err instanceof Error?err.message:'Could not start chat.')
+    }finally{setBusy(false)}
+  }
+
+  const sendMessage=async(e:React.FormEvent<HTMLFormElement>)=>{
+    e.preventDefault()
+    if(!draft.trim()||!threadId)return
+    const text=draft.trim()
+    setDraft('')
+    setBusy(true);setError('')
+    try{
+      const r=await fetch(`/api/chat/${encodeURIComponent(threadId)}/messages`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({message:text})
+      })
+      const data=await r.json()
+      if(!r.ok)throw new Error(data.error||'Could not send message.')
+      await loadMessages()
+    }catch(err){
+      setDraft(text)
+      setError(err instanceof Error?err.message:'Could not send message.')
+    }finally{setBusy(false)}
+  }
+
+  return <>
+    <button
+      type="button"
+      className="campaign-chat-launcher"
+      onClick={()=>setOpen(v=>!v)}
+      aria-label={open?'Close campaign chat':'Chat with the campaign'}
+      title="Chat with the campaign"
+    >
+      <MessageCircle/>
+    </button>
+
+    {open&&<aside className="campaign-chat-panel" aria-label="Campaign chat">
+      <div className="campaign-chat-head">
+        <div>
+          <strong>Chat with the campaign</strong>
+          <span>{content.candidateName} • Makueni County 2027</span>
+        </div>
+        <button type="button" onClick={()=>setOpen(false)} aria-label="Close chat"><X/></button>
+      </div>
+
+      {!threadId?
+        <form className="campaign-chat-start" onSubmit={startChat}>
+          <p>Enter your details to start a conversation. Your messages will be saved so the campaign team can reply.</p>
+          <label>Name<input value={name} onChange={e=>setName(e.target.value)} required/></label>
+          <label>Phone<input value={phone} onChange={e=>setPhone(e.target.value)} required inputMode="tel"/></label>
+          <label>Email <small>(optional)</small><input type="email" value={email} onChange={e=>setEmail(e.target.value)}/></label>
+          <button type="submit" className="btn primary" disabled={busy}>{busy?'Starting…':'Start chat'}</button>
+          {error&&<div className="chat-error">{error}</div>}
+        </form>
+      :
+        <>
+          <div className="campaign-chat-messages">
+            {messages.length===0&&<div className="chat-empty">Send your first message to the campaign team.</div>}
+            {messages.map(msg=><div key={msg.id} className={`chat-bubble ${msg.sender}`}>
+              <span>{msg.message}</span>
+              <small>{msg.created_at?new Date(msg.created_at).toLocaleString():''}</small>
+            </div>)}
+          </div>
+          <form className="campaign-chat-compose" onSubmit={sendMessage}>
+            <textarea value={draft} onChange={e=>setDraft(e.target.value)} placeholder="Type your message…" rows={2}/>
+            <button type="submit" disabled={busy||!draft.trim()} aria-label="Send message"><ArrowRight/></button>
+          </form>
+          {error&&<div className="chat-error">{error}</div>}
+        </>
+      }
+    </aside>}
+  </>
 }
 
 function Layout({ children, content }: { children: React.ReactNode; content: Content }) {
@@ -719,7 +860,7 @@ function updateSeo(path: string, content: Content) {
   if(canonical) canonical.href=window.location.origin+path
 }
 
-type AdminTab = 'dashboard'|'inbox'|'content'|'news'|'events'|'media'|'images'|'social'|'audit'
+type AdminTab = 'dashboard'|'inbox'|'content'|'news'|'events'|'media'|'images'|'social'|'audit' | 'messages'
 type CmsRow = Record<string, any> & { id: string }
 
 
@@ -1047,6 +1188,105 @@ function SocialMediaManager({ content, setContent, adminKey }: { content: Conten
   return <form className="social-admin-manager" onSubmit={save}><div className="cms-create-title"><Share2/><div><h2>Social media handles</h2><p>These links appear beside the leadership message and in the website footer.</p></div></div><div className="social-admin-grid"><label><FacebookIcon/> Facebook<input name="facebook" defaultValue={content.facebook||''} placeholder="https://facebook.com/..."/></label><label><X/> X (Twitter)<input name="twitter" defaultValue={content.twitter||''} placeholder="https://x.com/..."/></label><label><Instagram/> Instagram<input name="instagram" defaultValue={content.instagram||''} placeholder="https://instagram.com/..."/></label><label><Music2/> TikTok<input name="tiktok" defaultValue={content.tiktok||''} placeholder="https://tiktok.com/@..."/></label><label><Youtube/> YouTube<input name="youtube" defaultValue={content.youtube||''} placeholder="https://youtube.com/@..."/></label></div><button className="btn primary"><Save/> Save Social Handles</button>{message&&<div className="admin-message">{message}</div>}</form>
 }
 
+
+function AdminMessagesManager({adminKey}:{adminKey:string}) {
+  const [threads,setThreads]=React.useState<ChatThread[]>([])
+  const [active,setActive]=React.useState<ChatThread|null>(null)
+  const [messages,setMessages]=React.useState<ChatMessage[]>([])
+  const [draft,setDraft]=React.useState('')
+  const [busy,setBusy]=React.useState(false)
+
+  const headers={'x-admin-key':adminKey}
+
+  const loadThreads=async()=>{
+    const r=await fetch('/api/admin/chat/threads',{headers})
+    if(r.ok){
+      const data=await r.json()
+      setThreads(Array.isArray(data)?data:[])
+      if(active){
+        const refreshed=data.find((x:ChatThread)=>x.id===active.id)
+        if(refreshed)setActive(refreshed)
+      }
+    }
+  }
+
+  const openThread=async(thread:ChatThread)=>{
+    setActive(thread)
+    const r=await fetch(`/api/admin/chat/${thread.id}`,{headers})
+    if(r.ok){
+      const data=await r.json()
+      setMessages(data.messages||[])
+      await fetch(`/api/admin/chat/${thread.id}/read`,{method:'POST',headers})
+      loadThreads()
+    }
+  }
+
+  React.useEffect(()=>{
+    loadThreads()
+    const timer=window.setInterval(loadThreads,10000)
+    return()=>window.clearInterval(timer)
+  },[])
+
+  const reply=async(e:React.FormEvent<HTMLFormElement>)=>{
+    e.preventDefault()
+    if(!active||!draft.trim())return
+    setBusy(true)
+    const text=draft.trim()
+    setDraft('')
+    const r=await fetch(`/api/admin/chat/${active.id}/reply`,{
+      method:'POST',
+      headers:{...headers,'Content-Type':'application/json'},
+      body:JSON.stringify({message:text})
+    })
+    if(r.ok)await openThread(active)
+    else setDraft(text)
+    setBusy(false)
+  }
+
+  const setStatus=async(status:'open'|'closed')=>{
+    if(!active)return
+    const r=await fetch(`/api/admin/chat/${active.id}/status`,{
+      method:'PUT',
+      headers:{...headers,'Content-Type':'application/json'},
+      body:JSON.stringify({status})
+    })
+    if(r.ok){
+      await loadThreads()
+      setActive(prev=>prev?{...prev,status}:prev)
+    }
+  }
+
+  return <div className="admin-chat-manager">
+    <div className="admin-chat-threads">
+      <div className="cms-records-head"><div><h2>Messages</h2><span>{threads.length} conversations</span></div><button type="button" onClick={loadThreads}>Refresh</button></div>
+      {threads.length===0?<div className="empty-state"><MessageCircle/><h3>No conversations yet</h3><p>Website chat messages will appear here.</p></div>:
+      <div className="thread-list">
+        {threads.map(thread=><button type="button" key={thread.id} className={active?.id===thread.id?'active':''} onClick={()=>openThread(thread)}>
+          <div><strong>{thread.visitor_name}</strong><span>{thread.visitor_phone}</span></div>
+          <div>{thread.unread_count? <b>{thread.unread_count}</b>:null}<small>{thread.status}</small></div>
+        </button>)}
+      </div>}
+    </div>
+
+    <div className="admin-chat-conversation">
+      {!active?<div className="empty-state"><MessageCircle/><h3>Select a conversation</h3><p>Open a visitor conversation to view details and reply.</p></div>:
+      <>
+        <div className="conversation-head">
+          <div><h3>{active.visitor_name}</h3><a href={`tel:${active.visitor_phone.replace(/\s+/g,'')}`}>{active.visitor_phone}</a>{active.visitor_email&&<a href={`mailto:${active.visitor_email}`}>{active.visitor_email}</a>}</div>
+          <div><span className={`status-pill ${active.status}`}>{active.status}</span><button type="button" onClick={()=>setStatus(active.status==='open'?'closed':'open')}>{active.status==='open'?'Close':'Reopen'}</button></div>
+        </div>
+        <div className="admin-chat-messages">
+          {messages.map(msg=><div key={msg.id} className={`chat-bubble ${msg.sender}`}><span>{msg.message}</span><small>{msg.created_at?new Date(msg.created_at).toLocaleString():''}</small></div>)}
+        </div>
+        <form className="admin-chat-compose" onSubmit={reply}>
+          <textarea value={draft} onChange={e=>setDraft(e.target.value)} placeholder="Reply to this visitor…" rows={3}/>
+          <button type="submit" className="btn primary" disabled={busy||!draft.trim()}>{busy?'Sending…':'Send reply'}</button>
+        </form>
+      </>}
+    </div>
+  </div>
+}
+
 function AdminPage({ content, setContent }: { content: Content; setContent: React.Dispatch<React.SetStateAction<Content>> }) {
   const [key,setKey]=React.useState(sessionStorage.getItem('pk-admin-key')||'')
   const [logged,setLogged]=React.useState(false)
@@ -1071,9 +1311,9 @@ function AdminPage({ content, setContent }: { content: Content; setContent: Reac
 
   if(!logged) return <section className="admin-shell"><div className="admin-login"><LockKeyhole/><h1>Campaign Admin</h1><p>Secure content management for the Philip Kaloki campaign website.</p><form onSubmit={login}><input type="password" value={key} onChange={e=>setKey(e.target.value)} placeholder="Admin key"/><button className="btn primary">Sign in</button></form>{message&&<div className="form-error">{message}</div>}<a href="/">← Back to website</a></div></section>
 
-  const title={dashboard:'Command Dashboard',inbox:'Submission Inbox',content:'Official Website Content',news:'Newsroom Manager',events:'Events Manager',media:'Media Library',images:'Homepage Images',social:'Social Media',audit:'Audit Trail'}[tab]
+  const title={dashboard:'Command Dashboard',inbox:'Submission Inbox',messages:'Messages',content:'Official Website Content',news:'Newsroom Manager',events:'Events Manager',media:'Media Library',images:'Homepage Images',social:'Social Media',audit:'Audit Trail'}[tab]
   const statCards=[['Contacts',stats.contact_submissions||0,<Mail/>],['Volunteers',stats.volunteer_submissions||0,<Users/>],['Citizen ideas',stats.citizen_ideas||0,<MessageCircle/>],['Subscribers',stats.newsletter_subscribers||0,<Inbox/>],['News posts',stats.news_posts||0,<Newspaper/>],['Events',stats.events||0,<Calendar/>],['Media',stats.media_assets||0,<ImageIcon/>]]
-  return <section className="admin-shell cms-v17"><aside className="admin-sidebar"><div className="brand"><span className="brand-mark">PK</span><span><strong>CAMPAIGN CMS</strong><small>SUPABASE • PHASE 29</small></span></div>
+  return <section className="admin-shell cms-v17"><aside className="admin-sidebar"><div className="brand"><span className="brand-mark">PK</span><span><strong>CAMPAIGN CMS</strong><small>SUPABASE • PHASE 30</small></span></div>
     <button className={tab==='dashboard'?'active':''} onClick={()=>changeTab('dashboard')}><LayoutDashboard/> Dashboard</button>
     <button className={tab==='inbox'?'active':''} onClick={()=>changeTab('inbox')}><Inbox/> Submissions</button>
     <button className={tab==='content'?'active':''} onClick={()=>changeTab('content')}><Settings/> Website content</button>
@@ -1086,7 +1326,8 @@ function AdminPage({ content, setContent }: { content: Content; setContent: Reac
     <a href="/"><Eye/> View website</a><button onClick={()=>{sessionStorage.removeItem('pk-admin-key');location.reload()}}><LogOut/> Sign out</button></aside>
     <div className="admin-main"><div className="admin-top"><div><span>CAMPAIGN SECRETARIAT</span><h1>{title}</h1></div><button className="admin-refresh" onClick={()=>changeTab(tab)}><RefreshCw/> Refresh</button></div>{message&&<div className="admin-message">{message}</div>}
     {tab==='dashboard'&&<><div className="cms-stat-grid">{statCards.map(([label,value,icon])=><article key={String(label)}><span>{icon as React.ReactNode}</span><strong>{String(value)}</strong><small>{String(label)}</small></article>)}</div><div className="cms-welcome"><Database/><div><h2>Supabase CMS connected</h2><p>Website content, enquiries, volunteer records, news, events, media records and audit activity are managed from one production database.</p></div></div></>}
-    {tab==='inbox'&&<div className="submission-list">{rows.length===0?<div className="empty-state"><Inbox/><h3>No submissions yet</h3><p>Website submissions will appear here.</p></div>:rows.map(r=><article key={r.id}><div className="submission-head"><span className={`status ${r.status}`}>{r.status==='new'?<Clock3/>:<Check/>}{r.status}</span><strong>{(r.type||'submission').toUpperCase()}</strong><small>{new Date(r.createdAt).toLocaleString()}</small></div><h3>{r.name||r.email||'Website submission'}</h3><p>{r.message||r.subject||r.interest||'Newsletter subscription'}</p><div className="submission-meta">{Object.entries(r).filter(([k])=>!['id','type','createdAt','status','message'].includes(k)).slice(0,7).map(([k,v])=><span key={k}><b>{k}:</b> {String(v||'—')}</span>)}</div><div className="cms-actions"><button onClick={()=>changeStatus(r,'reviewed')}>Reviewed</button><button onClick={()=>changeStatus(r,'closed')}>Close</button></div></article>)}</div>}
+    {tab==='messages'&&<AdminMessagesManager adminKey={key}/>}
+        {tab==='inbox'&&<div className="submission-list">{rows.length===0?<div className="empty-state"><Inbox/><h3>No submissions yet</h3><p>Website submissions will appear here.</p></div>:rows.map(r=><article key={r.id}><div className="submission-head"><span className={`status ${r.status}`}>{r.status==='new'?<Clock3/>:<Check/>}{r.status}</span><strong>{(r.type||'submission').toUpperCase()}</strong><small>{new Date(r.createdAt).toLocaleString()}</small></div><h3>{r.name||r.email||'Website submission'}</h3><p>{r.message||r.subject||r.interest||'Newsletter subscription'}</p><div className="submission-meta">{Object.entries(r).filter(([k])=>!['id','type','createdAt','status','message'].includes(k)).slice(0,7).map(([k,v])=><span key={k}><b>{k}:</b> {String(v||'—')}</span>)}</div><div className="cms-actions"><button onClick={()=>changeStatus(r,'reviewed')}>Reviewed</button><button onClick={()=>changeStatus(r,'closed')}>Close</button></div></article>)}</div>}
     {tab==='content'&&<form className="admin-content-form cms-content" onSubmit={saveContent}>{Object.entries(content).map(([k,v])=><label key={k}>{k}<textarea name={k} defaultValue={v||''} rows={k==='biography'||k==='heroText'?4:2}/></label>)}<button disabled={busy} className="btn primary"><Save/> {busy?'Saving…':'Save Official Content'}</button></form>}
     {tab==='news'&&<CmsManager kind="news" rows={cmsRows} busy={busy} onSave={saveCms} onDelete={deleteCms} adminKey={key}/>}
     {tab==='events'&&<CmsManager kind="events" rows={cmsRows} busy={busy} onSave={saveCms} onDelete={deleteCms} adminKey={key}/>}

@@ -62,7 +62,7 @@ async function audit(action,entity_type,entity_id=null,details={}){const{error}=
 async function contentObject(){const{data,error}=await supabase.from('campaign_content').select('content_key,content_value');if(error)throw error;return Object.fromEntries((data||[]).map(r=>[r.content_key,r.content_value??'']))}
 function normalize(type,row){return{id:row.id,type,createdAt:row.created_at,status:row.status||'new',name:row.full_name||'',email:row.email||'',phone:row.phone||'',ward:row.ward||'',subCounty:row.sub_county||'',subject:row.subject||'',message:row.message||row.idea||'',interest:row.interest||'',category:row.category||''}}
 
-app.get('/api/health',async(_req,res)=>{const{error}=await supabase.from('campaign_content').select('id').limit(1);res.status(error?503:200).json({status:error?'error':'ok',service:'philip-kaloki-website-api',storage:'supabase-postgresql',phase:'phase-29'})})
+app.get('/api/health',async(_req,res)=>{const{error}=await supabase.from('campaign_content').select('id').limit(1);res.status(error?503:200).json({status:error?'error':'ok',service:'philip-kaloki-website-api',storage:'supabase-postgresql',phase:'phase-30'})})
 app.get('/api/content',async(_req,res)=>{try{res.setHeader('Cache-Control','public,max-age=60');res.json(await contentObject())}catch(e){console.error(e);res.status(500).json({error:'Unable to load content'})}})
 
 app.post('/api/submissions/:type',rateLimit(60_000,20),async(req,res)=>{
@@ -208,7 +208,116 @@ app.post('/api/admin/:kind/bulk-delete',adminOnly,async(req,res)=>{
   }
 })
 
-app.get('/api/admin/dashboard',adminOnly,async(_req,res)=>{try{const tables=['contact_submissions','volunteer_submissions','citizen_ideas','newsletter_subscribers','news_posts','events','media_assets','homepage_slides','event_images','news_images'];const result={};for(const table of tables){const{count,error}=await supabase.from(table).select('*',{count:'exact',head:true});if(error)throw error;result[table]=count||0}res.json(result)}catch(e){console.error(e);res.status(500).json({error:'Unable to load dashboard'})}})
+
+// Phase 30: website live chat
+app.post('/api/chat/start',rateLimit(60_000,10),async(req,res)=>{
+  try{
+    const p=clean(req.body)
+    const name=String(p.name||p.fullName||'').trim()
+    const phone=String(p.phone||'').trim()
+    const email=String(p.email||'').trim()
+    if(!name||!phone)return res.status(400).json({error:'Please enter your name and phone number.'})
+
+    const{data:thread,error}=await supabase.from('chat_threads').insert({
+      visitor_name:name,
+      visitor_phone:phone,
+      visitor_email:email||null,
+      status:'open',
+      unread_count:0
+    }).select('*').single()
+    if(error)throw error
+    res.status(201).json({ok:true,thread,messages:[]})
+  }catch(e){
+    console.error('chat start',e)
+    res.status(500).json({error:'Chat is temporarily unavailable. Please try again.'})
+  }
+})
+
+app.get('/api/chat/:id',rateLimit(60_000,60),async(req,res)=>{
+  try{
+    const{data:thread,error:tErr}=await supabase.from('chat_threads').select('*').eq('id',req.params.id).maybeSingle()
+    if(tErr)throw tErr
+    if(!thread)return res.status(404).json({error:'Conversation not found.'})
+    const{data:messages,error:mErr}=await supabase.from('chat_messages').select('*').eq('thread_id',thread.id).order('created_at',{ascending:true})
+    if(mErr)throw mErr
+    res.json({thread,messages:messages||[]})
+  }catch(e){console.error('chat get',e);res.status(500).json({error:'Unable to load conversation.'})}
+})
+
+app.post('/api/chat/:id/messages',rateLimit(60_000,20),async(req,res)=>{
+  try{
+    const message=String(clean(req.body).message||'').trim()
+    if(!message)return res.status(400).json({error:'Type a message first.'})
+    const{data:thread,error:tErr}=await supabase.from('chat_threads').select('id,status,unread_count').eq('id',req.params.id).maybeSingle()
+    if(tErr)throw tErr
+    if(!thread)return res.status(404).json({error:'Conversation not found.'})
+    if(thread.status==='closed')return res.status(400).json({error:'This conversation is closed. Start a new chat if you need more help.'})
+
+    const{data,error}=await supabase.from('chat_messages').insert({
+      thread_id:thread.id,
+      sender:'visitor',
+      message
+    }).select('*').single()
+    if(error)throw error
+
+    await supabase.from('chat_threads').update({
+      unread_count:(thread.unread_count||0)+1,
+      updated_at:new Date().toISOString()
+    }).eq('id',thread.id)
+
+    res.status(201).json({ok:true,message:data})
+  }catch(e){console.error('chat message',e);res.status(500).json({error:'Unable to send message.'})}
+})
+
+app.get('/api/admin/chat/threads',adminOnly,async(_req,res)=>{
+  try{
+    const{data,error}=await supabase.from('chat_threads').select('*').order('updated_at',{ascending:false}).order('created_at',{ascending:false})
+    if(error)throw error
+    res.json(data||[])
+  }catch(e){console.error('admin chat threads',e);res.status(500).json({error:'Unable to load conversations.'})}
+})
+
+app.get('/api/admin/chat/:id',adminOnly,async(req,res)=>{
+  try{
+    const{data:thread,error:tErr}=await supabase.from('chat_threads').select('*').eq('id',req.params.id).single()
+    if(tErr)throw tErr
+    const{data:messages,error:mErr}=await supabase.from('chat_messages').select('*').eq('thread_id',req.params.id).order('created_at',{ascending:true})
+    if(mErr)throw mErr
+    res.json({thread,messages:messages||[]})
+  }catch(e){console.error('admin chat thread',e);res.status(500).json({error:'Unable to load conversation.'})}
+})
+
+app.post('/api/admin/chat/:id/read',adminOnly,async(req,res)=>{
+  const{error}=await supabase.from('chat_threads').update({unread_count:0,updated_at:new Date().toISOString()}).eq('id',req.params.id)
+  res.status(error?500:200).json(error?{error:error.message}:{ok:true})
+})
+
+app.post('/api/admin/chat/:id/reply',adminOnly,async(req,res)=>{
+  try{
+    const message=String(clean(req.body).message||'').trim()
+    if(!message)return res.status(400).json({error:'Type a reply first.'})
+    const{data,error}=await supabase.from('chat_messages').insert({
+      thread_id:req.params.id,
+      sender:'admin',
+      message
+    }).select('*').single()
+    if(error)throw error
+    await supabase.from('chat_threads').update({updated_at:new Date().toISOString()}).eq('id',req.params.id)
+    await audit('chat_reply_sent','chat_threads',req.params.id,{message_id:data.id})
+    res.status(201).json({ok:true,message:data})
+  }catch(e){console.error('admin chat reply',e);res.status(500).json({error:'Unable to send reply.'})}
+})
+
+app.put('/api/admin/chat/:id/status',adminOnly,async(req,res)=>{
+  const status=String(req.body?.status||'')
+  if(!['open','closed'].includes(status))return res.status(400).json({error:'Invalid status.'})
+  const{error}=await supabase.from('chat_threads').update({status,updated_at:new Date().toISOString()}).eq('id',req.params.id)
+  if(error)return res.status(500).json({error:error.message})
+  await audit('chat_status_changed','chat_threads',req.params.id,{status})
+  res.json({ok:true})
+})
+
+app.get('/api/admin/dashboard',adminOnly,async(_req,res)=>{try{const tables=['contact_submissions','volunteer_submissions','citizen_ideas','newsletter_subscribers','news_posts','events','media_assets','homepage_slides','event_images','news_images','chat_threads','chat_messages'];const result={};for(const table of tables){const{count,error}=await supabase.from(table).select('*',{count:'exact',head:true});if(error)throw error;result[table]=count||0}res.json(result)}catch(e){console.error(e);res.status(500).json({error:'Unable to load dashboard'})}})
 app.get('/api/admin/submissions',adminOnly,async(_req,res)=>{try{const qs=await Promise.all(['contact_submissions','volunteer_submissions','citizen_ideas','newsletter_subscribers'].map(t=>supabase.from(t).select('*').order('created_at',{ascending:false})));const err=qs.find(q=>q.error)?.error;if(err)throw err;const rows=[...(qs[0].data||[]).map(r=>normalize('contact',r)),...(qs[1].data||[]).map(r=>normalize('volunteer',r)),...(qs[2].data||[]).map(r=>normalize('idea',r)),...(qs[3].data||[]).map(r=>normalize('newsletter',r))].sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt));res.json(rows)}catch(e){console.error(e);res.status(500).json({error:'Unable to load submissions'})}})
 app.patch('/api/admin/submissions/:type/:id',adminOnly,async(req,res)=>{try{const map={contact:'contact_submissions',volunteer:'volunteer_submissions',idea:'citizen_ideas',newsletter:'newsletter_subscribers'},table=map[req.params.type];if(!table)return res.status(400).json({error:'Invalid type'});const status=['new','reviewed','closed'].includes(String(req.body.status))?String(req.body.status):'new';const{data,error}=await supabase.from(table).update({status}).eq('id',req.params.id).select().single();if(error)throw error;await audit('submission_status_changed',table,data.id,{status});res.json(normalize(req.params.type,data))}catch(e){console.error(e);res.status(500).json({error:'Unable to update submission'})}})
 app.put('/api/admin/content',adminOnly,async(req,res)=>{try{const p=clean(req.body),rows=Object.entries(p).map(([content_key,content_value])=>({content_key,content_value:String(content_value),updated_at:new Date().toISOString()}));const{error}=await supabase.from('campaign_content').upsert(rows,{onConflict:'content_key'});if(error)throw error;await audit('campaign_content_updated','campaign_content',null,{fields:Object.keys(p)});res.json(await contentObject())}catch(e){console.error(e);res.status(500).json({error:'Unable to save content'})}})
