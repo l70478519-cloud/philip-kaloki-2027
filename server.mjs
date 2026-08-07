@@ -125,7 +125,7 @@ async function audit(action,entity_type,entity_id=null,details={}){const{error}=
 async function contentObject(){const{data,error}=await supabase.from('campaign_content').select('content_key,content_value');if(error)throw error;return Object.fromEntries((data||[]).map(r=>[r.content_key,r.content_value??'']))}
 function normalize(type,row){return{id:row.id,type,createdAt:row.created_at,status:row.status||'new',name:row.full_name||'',email:row.email||'',phone:row.phone||'',ward:row.ward||'',subCounty:row.sub_county||'',subject:row.subject||'',message:row.message||row.idea||'',interest:row.interest||'',category:row.category||''}}
 
-app.get('/api/health',async(_req,res)=>{const{error}=await supabase.from('campaign_content').select('id').limit(1);res.status(error?503:200).json({status:error?'error':'ok',service:'philip-kaloki-website-api',storage:'supabase-postgresql',phase:'phase-33'})})
+app.get('/api/health',async(_req,res)=>{const{error}=await supabase.from('campaign_content').select('id').limit(1);res.status(error?503:200).json({status:error?'error':'ok',service:'philip-kaloki-website-api',storage:'supabase-postgresql',phase:'phase-34'})})
 app.get('/api/content',async(_req,res)=>{try{res.setHeader('Cache-Control','public,max-age=60');res.json(await contentObject())}catch(e){console.error(e);res.status(500).json({error:'Unable to load content'})}})
 
 app.post('/api/submissions/:type',rateLimit(60_000,20),async(req,res)=>{
@@ -507,8 +507,109 @@ app.put('/api/admin/chat/:id/status',adminOnly,async(req,res)=>{
   res.json({ok:true})
 })
 
-app.get('/api/admin/dashboard',adminOnly,async(_req,res)=>{try{const tables=['contact_submissions','volunteer_submissions','citizen_ideas','newsletter_subscribers','news_posts','events','media_assets','homepage_slides','event_images','news_images','chat_threads','chat_messages'];const result={};for(const table of tables){const{count,error}=await supabase.from(table).select('*',{count:'exact',head:true});if(error)throw error;result[table]=count||0}res.json(result)}catch(e){console.error(e);res.status(500).json({error:'Unable to load dashboard'})}})
+
+app.post('/api/analytics/interaction',rateLimit(60_000,120),async(req,res)=>{
+  try{
+    const p=clean(req.body)
+    const event_type=String(p.event_type||'').slice(0,80)
+    if(!event_type)return res.status(400).json({error:'Missing interaction type'})
+    const row={
+      event_type,
+      label:String(p.label||'').slice(0,160)||null,
+      path:String(p.path||'').slice(0,240)||null,
+      session_id:String(p.session_id||'').slice(0,120)||null,
+      metadata:typeof req.body?.metadata==='object'&&req.body.metadata?req.body.metadata:{}
+    }
+    const{error}=await supabase.from('visitor_interactions').insert(row)
+    if(error)throw error
+    res.status(201).json({ok:true})
+  }catch(error){
+    console.error('interaction tracking',error)
+    res.status(202).json({ok:false})
+  }
+})
+
+
+app.get('/api/admin/reports',adminOnly,async(_req,res)=>{
+  try{
+    const [contacts,volunteers,ideas,news,events,media,chats,interactions]=await Promise.all([
+      supabase.from('contact_submissions').select('*').order('created_at',{ascending:false}).limit(1000),
+      supabase.from('volunteer_submissions').select('*').order('created_at',{ascending:false}).limit(1000),
+      supabase.from('citizen_ideas').select('*').order('created_at',{ascending:false}).limit(500),
+      supabase.from('news_posts').select('id',{count:'exact'}),
+      supabase.from('events').select('id',{count:'exact'}),
+      supabase.from('media_assets').select('id',{count:'exact'}),
+      supabase.from('chat_threads').select('id',{count:'exact'}),
+      supabase.from('visitor_interactions').select('event_type,path,label,created_at').order('created_at',{ascending:false}).limit(5000)
+    ])
+    const err=[contacts,volunteers,ideas,news,events,media,chats,interactions].find(x=>x.error)?.error
+    if(err)throw err
+
+    const countBy=(values)=>{
+      const map=new Map()
+      for(const value of values.map(v=>String(v||'').trim()).filter(Boolean))map.set(value,(map.get(value)||0)+1)
+      return Array.from(map.entries()).sort((a,b)=>b[1]-a[1]).slice(0,12).map(([label,count])=>({label,count}))
+    }
+
+    const directory=[
+      ...(contacts.data||[]).map(r=>({name:r.full_name||'',phone:r.phone||'',email:r.email||'',ward:r.ward||'',type:'Contact',interest:r.subject||''})),
+      ...(volunteers.data||[]).map(r=>({name:r.full_name||'',phone:r.phone||'',email:r.email||'',ward:r.ward||'',type:'Volunteer',interest:r.interest||''}))
+    ].filter(r=>r.phone||r.email)
+
+    const eventCounts=countBy((interactions.data||[]).map(r=>r.event_type)).map(x=>({event_type:x.label,count:x.count}))
+    const suggestions=[
+      ...(ideas.data||[]).map(r=>({name:r.full_name||'',ward:r.ward||'',text:r.idea||'',created_at:r.created_at||''})),
+      ...(contacts.data||[]).filter(r=>String(r.subject||'').toLowerCase().includes('proposal')).map(r=>({name:r.full_name||'',ward:r.ward||'',text:r.message||'',created_at:r.created_at||''}))
+    ].filter(x=>x.text).slice(0,100)
+
+    res.json({
+      generated_at:new Date().toISOString(),
+      totals:{
+        interactions:(interactions.data||[]).length,
+        contacts:(contacts.data||[]).length,
+        volunteers:(volunteers.data||[]).length,
+        ideas:(ideas.data||[]).length,
+        chat_threads:chats.count||0,
+        news:news.count||0,
+        events:events.count||0,
+        media:media.count||0
+      },
+      interactions:eventCounts,
+      top_wards:countBy([...(contacts.data||[]).map(r=>r.ward),...(volunteers.data||[]).map(r=>r.ward),...(ideas.data||[]).map(r=>r.ward)]),
+      top_interests:countBy((volunteers.data||[]).map(r=>r.interest)),
+      contacts:directory,
+      suggestions
+    })
+  }catch(error){
+    console.error('reports',error)
+    res.status(500).json({error:'Unable to generate report.'})
+  }
+})
+
+app.get('/api/admin/dashboard',adminOnly,async(_req,res)=>{try{const tables=['contact_submissions','volunteer_submissions','citizen_ideas','newsletter_subscribers','news_posts','events','media_assets','homepage_slides','event_images','news_images','chat_threads','chat_messages','visitor_interactions'];const result={};for(const table of tables){const{count,error}=await supabase.from(table).select('*',{count:'exact',head:true});if(error)throw error;result[table]=count||0}res.json(result)}catch(e){console.error(e);res.status(500).json({error:'Unable to load dashboard'})}})
 app.get('/api/admin/submissions',adminOnly,async(_req,res)=>{try{const qs=await Promise.all(['contact_submissions','volunteer_submissions','citizen_ideas','newsletter_subscribers'].map(t=>supabase.from(t).select('*').order('created_at',{ascending:false})));const err=qs.find(q=>q.error)?.error;if(err)throw err;const rows=[...(qs[0].data||[]).map(r=>normalize('contact',r)),...(qs[1].data||[]).map(r=>normalize('volunteer',r)),...(qs[2].data||[]).map(r=>normalize('idea',r)),...(qs[3].data||[]).map(r=>normalize('newsletter',r))].sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt));res.json(rows)}catch(e){console.error(e);res.status(500).json({error:'Unable to load submissions'})}})
+
+app.post('/api/admin/submissions/bulk-delete',adminOnly,async(req,res)=>{
+  try{
+    const map={contact:'contact_submissions',volunteer:'volunteer_submissions',idea:'citizen_ideas',newsletter:'newsletter_subscribers'}
+    const items=Array.isArray(req.body?.items)?req.body.items:[]
+    let count=0
+    for(const item of items){
+      const table=map[String(item?.type||'')]
+      const id=String(item?.id||'')
+      if(!table||!id)continue
+      const{error}=await supabase.from(table).delete().eq('id',id)
+      if(error)throw error
+      count++
+    }
+    await audit('submissions_bulk_deleted','submissions',null,{count})
+    res.json({ok:true,count})
+  }catch(error){
+    console.error('submission bulk delete',error)
+    res.status(500).json({error:'Unable to delete selected submissions.'})
+  }
+})
+
 app.patch('/api/admin/submissions/:type/:id',adminOnly,async(req,res)=>{try{const map={contact:'contact_submissions',volunteer:'volunteer_submissions',idea:'citizen_ideas',newsletter:'newsletter_subscribers'},table=map[req.params.type];if(!table)return res.status(400).json({error:'Invalid type'});const status=['new','reviewed','closed'].includes(String(req.body.status))?String(req.body.status):'new';const{data,error}=await supabase.from(table).update({status}).eq('id',req.params.id).select().single();if(error)throw error;await audit('submission_status_changed',table,data.id,{status});res.json(normalize(req.params.type,data))}catch(e){console.error(e);res.status(500).json({error:'Unable to update submission'})}})
 app.put('/api/admin/content',adminOnly,async(req,res)=>{try{const p=clean(req.body),rows=Object.entries(p).map(([content_key,content_value])=>({content_key,content_value:String(content_value),updated_at:new Date().toISOString()}));const{error}=await supabase.from('campaign_content').upsert(rows,{onConflict:'content_key'});if(error)throw error;await audit('campaign_content_updated','campaign_content',null,{fields:Object.keys(p)});res.json(await contentObject())}catch(e){console.error(e);res.status(500).json({error:'Unable to save content'})}})
 
@@ -522,6 +623,7 @@ function crud(table,kind){
   app.post(`/api/admin/${kind}`,adminOnly,async(req,res)=>{
     const p=clean(req.body)
     p.published=String(req.body?.published||'false')==='true'
+    if('is_live' in req.body)p.is_live=String(req.body?.is_live||'false')==='true'
     const{data,error}=await supabase.from(table).insert(p).select().single()
     if(error)return res.status(500).json({error:error.message})
     await audit(`${kind}_created`,table,data.id)
@@ -531,6 +633,7 @@ function crud(table,kind){
   app.put(`/api/admin/${kind}/:id`,adminOnly,async(req,res)=>{
     const p=clean(req.body)
     p.published=String(req.body?.published||'false')==='true'
+    if('is_live' in req.body)p.is_live=String(req.body?.is_live||'false')==='true'
     p.updated_at=new Date().toISOString()
     const{data,error}=await supabase.from(table).update(p).eq('id',req.params.id).select().single()
     if(error)return res.status(500).json({error:error.message})
