@@ -3,6 +3,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import dotenv from 'dotenv'
+import multer from 'multer'
 import { createClient } from '@supabase/supabase-js'
 
 dotenv.config()
@@ -15,6 +16,30 @@ const SUPABASE_URL = process.env.SUPABASE_URL || ''
 const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY || ''
 if (!SUPABASE_URL || !SUPABASE_SECRET_KEY) { console.error('Missing SUPABASE_URL or SUPABASE_SECRET_KEY'); process.exit(1) }
 const supabase = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, { auth: { persistSession:false, autoRefreshToken:false } })
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = new Set([
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/gif',
+      'application/pdf'
+    ])
+    cb(null, allowed.has(file.mimetype))
+  }
+})
+
+function safeFileName(name = 'upload') {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
 const buckets = new Map()
 
 app.set('trust proxy',1); app.disable('x-powered-by'); app.use(express.json({limit:'250kb'}))

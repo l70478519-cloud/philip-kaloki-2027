@@ -198,7 +198,10 @@ function NewsPage(){
               <span>{post.category || 'Campaign Update'}</span>
               <h2>{post.title}</h2>
               <p>{post.summary || post.body || ''}</p>
-              {post.published_at && <small>{new Date(post.published_at).toLocaleDateString()}</small>}
+              <div className="live-card-actions">
+                {post.published_at && <small>{new Date(post.published_at).toLocaleDateString()}</small>}
+                {post.slug && <a href={`/news/${post.slug}`}>Read full article →</a>}
+              </div>
             </div>
           </article>)}
         </div>}
@@ -207,6 +210,78 @@ function NewsPage(){
   </main>
 }
 
+
+
+function NewsDetailPage({ slug }: { slug: string }) {
+  const [post, setPost] = React.useState<LiveNewsPost | null>(null)
+  const [loading, setLoading] = React.useState(true)
+
+  React.useEffect(() => {
+    fetch(`/api/news/${encodeURIComponent(slug)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(setPost)
+      .catch(() => setPost(null))
+      .finally(() => setLoading(false))
+  }, [slug])
+
+  if (loading) return <main className="inner-page"><section className="section"><div className="container"><div className="public-empty">Loading article…</div></div></section></main>
+  if (!post) return <NotFoundPage/>
+
+  return <main className="inner-page">
+    <section className="article-hero">
+      <div className="container article-wrap">
+        <span className="section-kicker">{post.category || 'Campaign Update'}</span>
+        <h1>{post.title}</h1>
+        {post.published_at && <p className="article-meta">{new Date(post.published_at).toLocaleString()}</p>}
+      </div>
+    </section>
+    <article className="section">
+      <div className="container article-wrap">
+        {post.image_url && <img className="article-cover" src={post.image_url} alt="" />}
+        {post.summary && <p className="article-summary">{post.summary}</p>}
+        <div className="article-body">{(post.body || '').split('\n').map((p,i)=><p key={i}>{p}</p>)}</div>
+        <a className="detail-link" href="/news">← Back to news</a>
+      </div>
+    </article>
+  </main>
+}
+
+function EventDetailPage({ id }: { id: string }) {
+  const [event, setEvent] = React.useState<LiveEvent | null>(null)
+  const [loading, setLoading] = React.useState(true)
+
+  React.useEffect(() => {
+    fetch(`/api/events/${encodeURIComponent(id)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(setEvent)
+      .catch(() => setEvent(null))
+      .finally(() => setLoading(false))
+  }, [id])
+
+  if (loading) return <main className="inner-page"><section className="section"><div className="container"><div className="public-empty">Loading event…</div></div></section></main>
+  if (!event) return <NotFoundPage/>
+
+  return <main className="inner-page">
+    <section className="article-hero">
+      <div className="container article-wrap">
+        <span className="section-kicker">Campaign Event</span>
+        <h1>{event.title}</h1>
+        {event.event_date && <p className="article-meta">{new Date(event.event_date).toLocaleString()}</p>}
+      </div>
+    </section>
+    <section className="section">
+      <div className="container article-wrap">
+        {event.image_url && <img className="article-cover" src={event.image_url} alt="" />}
+        <div className="event-detail-card">
+          <strong>Location</strong>
+          <p>{[event.venue,event.ward].filter(Boolean).join(' • ') || 'Venue to be announced'}</p>
+        </div>
+        <div className="article-body"><p>{event.description || ''}</p></div>
+        <a className="detail-link" href="/events">← Back to events</a>
+      </div>
+    </section>
+  </main>
+}
 
 function EventsPage(){
   const { data: events, loading } = useLiveApi<LiveEvent[]>('/api/events', [])
@@ -225,7 +300,7 @@ function EventsPage(){
         <div className="live-events-grid">
           {events.map(event => <article className="live-event-card" key={event.id}>
             <div className="live-event-date">{event.event_date ? new Date(event.event_date).toLocaleDateString(undefined,{month:'short',day:'2-digit'}) : 'TBA'}</div>
-            <div><h3>{event.title}</h3><p>{event.description || ''}</p><small>{[event.venue,event.ward].filter(Boolean).join(' • ')}</small></div>
+            <div><h3>{event.title}</h3><p>{event.description || ''}</p><small>{[event.venue,event.ward].filter(Boolean).join(' • ')}</small><div><a className="detail-link" href={`/events/${event.id}`}>View event →</a></div></div>
           </article>)}
         </div>}
       </div>
@@ -261,8 +336,8 @@ function MediaPage({ content }: { content: Content }) {
             <div className="cms-empty public-empty">
               <h3>No published media yet</h3>
               <p>
-                Media published from the campaign CMS will
-                automatically appear here.
+                Media uploaded and published through the campaign
+                CMS will automatically appear here.
               </p>
             </div>
           ) : (
@@ -292,12 +367,12 @@ function MediaPage({ content }: { content: Content }) {
                     </span>
 
                     <h3>
-                      {item.title || 'Campaign media'}
+                      {item.title || 'Campaign Media'}
                     </h3>
 
-                    <p>
-                      {item.description || ''}
-                    </p>
+                    {item.description && (
+                      <p>{item.description}</p>
+                    )}
 
                     {item.file_url && (
                       <a
@@ -305,7 +380,7 @@ function MediaPage({ content }: { content: Content }) {
                         target="_blank"
                         rel="noreferrer"
                       >
-                        Open media →
+                        View media →
                       </a>
                     )}
                   </div>
@@ -373,6 +448,19 @@ function updateSeo(path: string, content: Content) {
 type AdminTab = 'dashboard'|'inbox'|'content'|'news'|'events'|'media'|'audit'
 type CmsRow = Record<string, any> & { id: string }
 
+
+async function uploadAdminFile(file: File, key: string) {
+  const body = new FormData()
+  body.append('file', file)
+  const response = await fetch('/api/admin/upload', {
+    method: 'POST',
+    headers: { 'x-admin-key': key },
+    body
+  })
+  if (!response.ok) throw new Error('Upload failed')
+  return response.json()
+}
+
 function AdminPage({ content, setContent }: { content: Content; setContent: React.Dispatch<React.SetStateAction<Content>> }) {
   const [key,setKey]=React.useState(sessionStorage.getItem('pk-admin-key')||'')
   const [logged,setLogged]=React.useState(false)
@@ -423,7 +511,7 @@ function CmsManager({kind,rows,busy,onSave,onDelete}:{kind:'news'|'events'|'medi
   const [editing,setEditing]=React.useState<CmsRow|null>(null)
   React.useEffect(()=>setEditing(null),[kind])
   return <div className="cms-manager"><form key={editing?.id||`new-${kind}`} className="cms-create" onSubmit={e=>{onSave(kind,e,editing?.id);setEditing(null)}}><div className="cms-create-title"><Plus/><div><h2>{editing?'Edit':'Create'} {kind==='news'?'news post':kind==='events'?'event':'media item'}</h2><p>Saved directly to Supabase.</p></div></div>
-    {kind==='news'&&<><label>Title<input name="title" required defaultValue={editing?.title||''}/> </label><label>Slug<input name="slug" placeholder="e.g. makueni-community-listening" defaultValue={editing?.slug||''}/> </label><label>Category<input name="category" placeholder="Campaign Update" defaultValue={editing?.category||''}/> </label><label>Summary<textarea name="summary" rows={3} defaultValue={editing?.summary||''}/> </label><label>Full article<textarea name="body" rows={6} defaultValue={editing?.body||''}/> </label><label>Image URL<input name="image_url" placeholder="/assets/... or https://..." defaultValue={editing?.image_url||''}/> </label><input type="hidden" name="published" value="true"/><input type="hidden" name="published_at" value={new Date().toISOString()}/></>}
+    {kind==='news'&&<><label>Title<input name="title" required defaultValue={editing?.title||''}/> </label><label>Slug<input name="slug" placeholder="e.g. makueni-community-listening" defaultValue={editing?.slug||''}/> </label><label>Category<input name="category" placeholder="Campaign Update" defaultValue={editing?.category||''}/> </label><label>Summary<textarea name="summary" rows={3} defaultValue={editing?.summary||''}/> </label><label>Full article<textarea name="body" rows={6} defaultValue={editing?.body||''}/> </label><label>Image URL<input name="image_url" placeholder="Upload below or paste /assets/... or https://..." defaultValue={editing?.image_url||''}/> </label><input type="hidden" name="published" value="true"/><input type="hidden" name="published_at" value={new Date().toISOString()}/></>}
     {kind==='events'&&<><label>Event title<input name="title" required defaultValue={editing?.title||''}/> </label><label>Venue<input name="venue" defaultValue={editing?.venue||''}/> </label><label>Ward<input name="ward" defaultValue={editing?.ward||''}/> </label><label>Date and time<input name="event_date" type="datetime-local" defaultValue={editing?.event_date?String(editing.event_date).slice(0,16):''}/> </label><label>Description<textarea name="description" rows={4} defaultValue={editing?.description||''}/> </label><label>Image URL<input name="image_url" defaultValue={editing?.image_url||''}/> </label><input type="hidden" name="published" value="true"/></>}
     {kind==='media'&&<><label>Title<input name="title" required defaultValue={editing?.title||''}/> </label><label>Type<select name="asset_type" defaultValue={editing?.asset_type||"photo"}><option value="photo">Photo</option><option value="video">Video</option><option value="document">Document</option></select></label><label>File / media URL<input name="file_url" required defaultValue={editing?.file_url||''}/> </label><label>Thumbnail URL<input name="thumbnail_url" defaultValue={editing?.thumbnail_url||''}/> </label><label>Description<textarea name="description" rows={4} defaultValue={editing?.description||''}/> </label><input type="hidden" name="published" value="true"/></>}
     <div className="cms-form-actions"><button className="btn primary" disabled={busy}><Save/> {busy?'Saving…':editing?'Save Changes':'Publish'}</button>{editing&&<button type="button" className="cms-cancel" onClick={()=>setEditing(null)}>Cancel edit</button>}</div></form>
@@ -436,6 +524,8 @@ function PublicApp() {
   const path=window.location.pathname.replace(/\/+$/,'')||'/'
   React.useEffect(()=>updateSeo(path,content),[path,content])
   if(path==='/admin') return <AdminPage content={content} setContent={setContent}/>
+  if(path.startsWith('/news/')) return <Layout content={content}><NewsDetailPage slug={decodeURIComponent(path.slice('/news/'.length))}/></Layout>
+  if(path.startsWith('/events/')) return <Layout content={content}><EventDetailPage id={decodeURIComponent(path.slice('/events/'.length))}/></Layout>
   let page:React.ReactNode
   if(path==='/') page=<HomePage content={content}/>
   else if(path==='/about') page=<AboutPage content={content}/>
