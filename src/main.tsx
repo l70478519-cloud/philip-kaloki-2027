@@ -718,9 +718,151 @@ function MediaPage({ content }: { content: Content }) {
   </main>
 }
 function ContactPage({ content }: { content: Content }) {
-  const [state,setState] = React.useState('')
-  const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); setState('sending'); const data = Object.fromEntries(new FormData(e.currentTarget)); try { await submit('contact', data); setState('sent'); e.currentTarget.reset() } catch { setState('error') } }
-  return <><PageHero kicker="CONTACT THE CAMPAIGN" title="We are ready to hear from you." text="Send a question, invitation, development proposal or media request to the campaign secretariat."/><section className="section contact-section"><div className="container contact-grid"><div><div className="contact-list"><div><MapPin/><span><strong>Campaign Secretariat</strong><small>{content.office}</small></span></div><a href={`tel:${content.phone.replace(/\s+/g,'')}`}><Phone/><span><strong>Telephone</strong><small>{content.phone}</small></span></a><a href={`mailto:${content.email}`}><Mail/><span><strong>Email</strong><small>{content.email}</small></span></a></div></div><form className="contact-form" onSubmit={onSubmit}><div className="form-row"><label>Full name<input name="name" required/></label><label>Phone number<input name="phone" required/></label></div><div className="form-row"><label>Email<input name="email" type="email"/></label><label>Subject<select name="subject" required defaultValue=""><option value="" disabled>Select one</option><option>General enquiry</option><option>Media request</option><option>Event invitation</option><option>Development proposal</option><option>Partnership</option></select></label></div><label>Your message<textarea name="message" required rows={6}/></label><input className="hp-field" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true"/><button type="submit" className="btn primary submit" disabled={state==='sending'}>{state==='sending'?'Sending…':'Send Message'} <ArrowRight size={18}/></button>{state==='sent'&&<div className="success">Thank you. Your message has been saved.</div>}{state==='error'&&<div className="form-error"><strong>Could not submit your message.</strong><small>Please try again or use the campaign phone, email or WhatsApp links.</small></div>}</form></div></section></>
+  const [state,setState]=React.useState<'idle'|'sending'|'sent'|'error'>('idle')
+  const [errorMessage,setErrorMessage]=React.useState('')
+
+  const onSubmit=async(e:React.FormEvent<HTMLFormElement>)=>{
+    e.preventDefault()
+
+    const form=e.currentTarget
+
+    setState('sending')
+    setErrorMessage('')
+
+    const data=Object.fromEntries(new FormData(form))
+
+    try{
+      await submit('contact',data)
+
+      form.reset()
+      setState('sent')
+    }catch(error){
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : 'Unable to submit your message.'
+      )
+      setState('error')
+    }
+  }
+
+  return <>
+    <PageHero
+      kicker="CONTACT THE CAMPAIGN"
+      title="We are ready to hear from you."
+      text="Send a question, invitation, development proposal or media request to the campaign secretariat."
+    />
+
+    <section className="section contact-section">
+      <div className="container contact-grid">
+
+        <div>
+          <div className="contact-list">
+
+            <div>
+              <MapPin/>
+              <span>
+                <strong>Campaign Secretariat</strong>
+                <small>{content.office}</small>
+              </span>
+            </div>
+
+            <a href={`tel:${content.phone.replace(/\s+/g,'')}`}>
+              <Phone/>
+              <span>
+                <strong>Telephone</strong>
+                <small>{content.phone}</small>
+              </span>
+            </a>
+
+            <a href={`mailto:${content.email}`}>
+              <Mail/>
+              <span>
+                <strong>Email</strong>
+                <small>{content.email}</small>
+              </span>
+            </a>
+
+          </div>
+        </div>
+
+        <form className="contact-form" onSubmit={onSubmit}>
+
+          <div className="form-row">
+            <label>
+              Full name
+              <input name="name" required autoComplete="name"/>
+            </label>
+
+            <label>
+              Phone number
+              <input name="phone" required autoComplete="tel" inputMode="tel"/>
+            </label>
+          </div>
+
+          <div className="form-row">
+
+            <label>
+              Email
+              <input name="email" type="email" autoComplete="email"/>
+            </label>
+
+            <label>
+              Subject
+              <select name="subject" required defaultValue="">
+                <option value="" disabled>Select one</option>
+                <option>General enquiry</option>
+                <option>Media request</option>
+                <option>Event invitation</option>
+                <option>Development proposal</option>
+                <option>Partnership</option>
+              </select>
+            </label>
+
+          </div>
+
+          <label>
+            Your message
+            <textarea name="message" required rows={6}/>
+          </label>
+
+          <input
+            className="hp-field"
+            name="website"
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
+          />
+
+          <button
+            type="submit"
+            className="btn primary submit"
+            disabled={state==='sending'}
+          >
+            {state==='sending' ? 'Sending…' : 'Send Message'}
+            <ArrowRight size={18}/>
+          </button>
+
+          {state==='sent'&&
+            <div className="success">
+              <strong>Message received.</strong>
+              <span>Your message has been saved successfully. The campaign team can review it from the Admin dashboard.</span>
+            </div>
+          }
+
+          {state==='error'&&
+            <div className="form-error">
+              <strong>Could not submit your message.</strong>
+              <span>{errorMessage}</span>
+              <small>Please try again or contact the campaign by phone, email or chat.</small>
+            </div>
+          }
+
+        </form>
+
+      </div>
+    </section>
+  </>
 }
 
 function VolunteerPage() {
