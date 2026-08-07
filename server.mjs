@@ -17,6 +17,69 @@ const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY || ''
 if (!SUPABASE_URL || !SUPABASE_SECRET_KEY) { console.error('Missing SUPABASE_URL or SUPABASE_SECRET_KEY'); process.exit(1) }
 const supabase = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, { auth: { persistSession:false, autoRefreshToken:false } })
 
+const chatSseClients=new Map()
+const adminSseClients=new Set()
+const typingState=new Map()
+const presenceState=new Map()
+let chatRealtimeLastMessageAt=new Date(0).toISOString()
+let chatRealtimeLastThreadAt=new Date(0).toISOString()
+
+function sseWrite(res,event){
+  try{res.write(`data: ${JSON.stringify(event)}\n\n`)}catch{}
+}
+
+function broadcastThread(threadId,event){
+  const clients=chatSseClients.get(threadId)
+  if(clients)for(const res of clients)sseWrite(res,{...event,thread_id:threadId})
+  for(const res of adminSseClients)sseWrite(res,{...event,thread_id:threadId})
+}
+
+function broadcastAdmins(event){
+  for(const res of adminSseClients)sseWrite(res,event)
+}
+
+function setTyping(threadId,sender,typing){
+  const key=`${threadId}:${sender}`
+  typingState.set(key,{typing:Boolean(typing),updated_at:Date.now()})
+  broadcastThread(threadId,{type:'typing',payload:{sender,typing:Boolean(typing)}})
+}
+
+function setPresence(threadId,role){
+  const active_at=new Date().toISOString()
+  presenceState.set(`${threadId}:${role}`,active_at)
+  broadcastThread(threadId,{type:'presence',payload:{role,active_at}})
+  return active_at
+}
+
+setInterval(async()=>{
+  try{
+    const{data:messages}=await supabase.from('chat_messages').select('*').gt('created_at',chatRealtimeLastMessageAt).order('created_at',{ascending:true}).limit(100)
+    for(const message of messages||[]){
+      if(message.created_at>chatRealtimeLastMessageAt)chatRealtimeLastMessageAt=message.created_at
+      broadcastThread(message.thread_id,{type:'message',payload:message})
+    }
+
+    const{data:threads}=await supabase.from('chat_threads').select('*').gt('updated_at',chatRealtimeLastThreadAt).order('updated_at',{ascending:true}).limit(100)
+    for(const thread of threads||[]){
+      if(thread.updated_at>chatRealtimeLastThreadAt)chatRealtimeLastThreadAt=thread.updated_at
+      broadcastThread(thread.id,{type:'thread',payload:thread})
+    }
+  }catch(error){
+    console.error('chat realtime poll',error)
+  }
+},1200)
+
+setInterval(()=>{
+  for(const [key,state] of typingState.entries()){
+    if(state.typing&&Date.now()-state.updated_at>3500){
+      const [threadId,sender]=key.split(':')
+      typingState.set(key,{typing:false,updated_at:Date.now()})
+      broadcastThread(threadId,{type:'typing',payload:{sender,typing:false}})
+    }
+  }
+},1500)
+
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 8 * 1024 * 1024 },
@@ -62,7 +125,7 @@ async function audit(action,entity_type,entity_id=null,details={}){const{error}=
 async function contentObject(){const{data,error}=await supabase.from('campaign_content').select('content_key,content_value');if(error)throw error;return Object.fromEntries((data||[]).map(r=>[r.content_key,r.content_value??'']))}
 function normalize(type,row){return{id:row.id,type,createdAt:row.created_at,status:row.status||'new',name:row.full_name||'',email:row.email||'',phone:row.phone||'',ward:row.ward||'',subCounty:row.sub_county||'',subject:row.subject||'',message:row.message||row.idea||'',interest:row.interest||'',category:row.category||''}}
 
-app.get('/api/health',async(_req,res)=>{const{error}=await supabase.from('campaign_content').select('id').limit(1);res.status(error?503:200).json({status:error?'error':'ok',service:'philip-kaloki-website-api',storage:'supabase-postgresql',phase:'phase-32'})})
+app.get('/api/health',async(_req,res)=>{const{error}=await supabase.from('campaign_content').select('id').limit(1);res.status(error?503:200).json({status:error?'error':'ok',service:'philip-kaloki-website-api',storage:'supabase-postgresql',phase:'phase-33'})})
 app.get('/api/content',async(_req,res)=>{try{res.setHeader('Cache-Control','public,max-age=60');res.json(await contentObject())}catch(e){console.error(e);res.status(500).json({error:'Unable to load content'})}})
 
 app.post('/api/submissions/:type',rateLimit(60_000,20),async(req,res)=>{
@@ -235,6 +298,57 @@ app.post('/api/admin/:kind/bulk-delete',adminOnly,async(req,res)=>{
 
 
 // Phase 30: website live chat
+
+app.get('/api/chat/:id/stream',(req,res)=>{
+  const id=String(req.params.id||'')
+  res.setHeader('Content-Type','text/event-stream')
+  res.setHeader('Cache-Control','no-cache, no-transform')
+  res.setHeader('Connection','keep-alive')
+  res.flushHeaders?.()
+
+  if(!chatSseClients.has(id))chatSseClients.set(id,new Set())
+  chatSseClients.get(id).add(res)
+  setPresence(id,'visitor')
+  sseWrite(res,{type:'ping'})
+
+  const heartbeat=setInterval(()=>sseWrite(res,{type:'ping'}),20000)
+  req.on('close',()=>{
+    clearInterval(heartbeat)
+    const clients=chatSseClients.get(id)
+    clients?.delete(res)
+    if(clients&&clients.size===0)chatSseClients.delete(id)
+  })
+})
+
+app.get('/api/admin/chat/stream',adminOnly,(req,res)=>{
+  res.setHeader('Content-Type','text/event-stream')
+  res.setHeader('Cache-Control','no-cache, no-transform')
+  res.setHeader('Connection','keep-alive')
+  res.flushHeaders?.()
+  adminSseClients.add(res)
+  sseWrite(res,{type:'ping'})
+  const heartbeat=setInterval(()=>sseWrite(res,{type:'ping'}),20000)
+  req.on('close',()=>{clearInterval(heartbeat);adminSseClients.delete(res)})
+})
+
+app.post('/api/chat/:id/typing',rateLimit(60_000,120),(req,res)=>{
+  const sender=String(req.body?.sender||'visitor')
+  if(sender!=='visitor')return res.status(400).json({error:'Invalid sender.'})
+  setPresence(req.params.id,'visitor')
+  setTyping(req.params.id,'visitor',Boolean(req.body?.typing))
+  res.json({ok:true})
+})
+
+app.post('/api/admin/chat/:id/typing',adminOnly,(req,res)=>{
+  setPresence(req.params.id,'admin')
+  setTyping(req.params.id,'admin',Boolean(req.body?.typing))
+  res.json({ok:true})
+})
+
+app.post('/api/admin/chat/:id/presence',adminOnly,(req,res)=>{
+  res.json({ok:true,active_at:setPresence(req.params.id,'admin')})
+})
+
 app.post('/api/chat/start',rateLimit(60_000,10),async(req,res)=>{
   try{
     const p=clean(req.body)
@@ -265,7 +379,7 @@ app.get('/api/chat/:id',rateLimit(60_000,60),async(req,res)=>{
     if(!thread)return res.status(404).json({error:'Conversation not found.'})
     const{data:messages,error:mErr}=await supabase.from('chat_messages').select('*').eq('thread_id',thread.id).order('created_at',{ascending:true})
     if(mErr)throw mErr
-    res.json({thread,messages:messages||[]})
+    res.json({thread:{...thread,admin_active_at:presenceState.get(`${thread.id}:admin`)||null,visitor_active_at:presenceState.get(`${thread.id}:visitor`)||null},messages:messages||[]})
   }catch(e){console.error('chat get',e);res.status(500).json({error:'Unable to load conversation.'})}
 })
 
@@ -359,7 +473,7 @@ app.get('/api/admin/chat/:id',adminOnly,async(req,res)=>{
     if(tErr)throw tErr
     const{data:messages,error:mErr}=await supabase.from('chat_messages').select('*').eq('thread_id',req.params.id).order('created_at',{ascending:true})
     if(mErr)throw mErr
-    res.json({thread,messages:messages||[]})
+    res.json({thread:{...thread,admin_active_at:presenceState.get(`${thread.id}:admin`)||null,visitor_active_at:presenceState.get(`${thread.id}:visitor`)||null},messages:messages||[]})
   }catch(e){console.error('admin chat thread',e);res.status(500).json({error:'Unable to load conversation.'})}
 })
 

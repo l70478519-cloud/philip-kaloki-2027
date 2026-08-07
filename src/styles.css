@@ -401,3 +401,22 @@ a[href^="tel:"],a[href^="mailto:"],a[href^="https://wa.me"]{touch-action:manipul
   .campaign-chat-panel{width:100%!important;height:min(650px,calc(100vh - 90px))!important}
   .campaign-chat-launcher{right:14px!important;bottom:14px!important}
 }
+
+
+/* Phase 33 — realtime chat and notifications */
+.chat-head-actions{display:flex;gap:4px;align-items:center}
+.chat-head-actions button{display:grid;place-items:center;width:34px;height:34px;border-radius:999px!important}
+.chat-head-actions svg{width:17px;height:17px}
+.typing-indicator{align-self:flex-start;display:flex;align-items:center;gap:4px;padding:8px 10px;color:#60727d;font-size:12px}
+.typing-indicator>span{width:6px;height:6px;border-radius:999px;background:#82949e;animation:typingBounce 1.2s infinite ease-in-out}
+.typing-indicator>span:nth-child(2){animation-delay:.15s}.typing-indicator>span:nth-child(3){animation-delay:.3s}
+@keyframes typingBounce{0%,60%,100%{transform:translateY(0);opacity:.45}30%{transform:translateY(-4px);opacity:1}}
+
+.admin-chat-shell{display:grid;gap:12px}
+.admin-chat-toolbar{background:#0b3553;color:#fff;border-radius:14px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.admin-chat-toolbar>div{display:flex;align-items:center;gap:10px}.admin-chat-toolbar span{opacity:.75;font-size:12px}
+.admin-chat-toolbar button{border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;border-radius:9px;padding:8px 11px;display:flex;align-items:center;gap:7px;cursor:pointer}
+.admin-chat-toolbar svg{width:17px;height:17px}
+.presence-line{display:flex!important;align-items:center;gap:5px;color:#0d8055!important;font-size:12px}
+.presence-line svg{width:8px;height:8px;fill:currentColor}
+.admin-nav-badge{margin-left:auto;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:#e23e3e;color:#fff;display:inline-grid;place-items:center;font-size:10px;font-weight:900}

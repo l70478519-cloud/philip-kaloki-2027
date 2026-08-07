@@ -1,12 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import {
-  ArrowRight, CalendarDays, CheckCircle2, ChevronUp, Droplets,
-  HeartHandshake, Camera as Instagram, Landmark, Mail, MapPin, Menu, MessageCircle, Megaphone,
-  Newspaper, Phone, PlayCircle, ShieldCheck, Sprout, Stethoscope, Target, FileText, Download,
-  Users, X, PlayCircle as Youtube, BriefcaseBusiness, GraduationCap, LockKeyhole, LayoutDashboard,
-  Inbox, Save, Home as HomeIcon, LogOut, Settings, Eye, Check, Clock3, ExternalLink, Image as ImageIcon, FileCheck2, BarChart3, Plus, Trash2, RefreshCw, Activity, Calendar, Database, Edit3, Music2, Share2, ArrowUp, ArrowDown
-} from 'lucide-react'
+import {ArrowRight, CalendarDays, CheckCircle2, ChevronUp, Droplets, HeartHandshake, Camera as Instagram, Landmark, Mail, MapPin, Menu, MessageCircle, Megaphone, Newspaper, Phone, PlayCircle, ShieldCheck, Sprout, Stethoscope, Target, FileText, Download, Users, X, PlayCircle as Youtube, BriefcaseBusiness, GraduationCap, LockKeyhole, LayoutDashboard, Inbox, Save, Home as HomeIcon, LogOut, Settings, Eye, Check, Clock3, ExternalLink, Image as ImageIcon, FileCheck2, BarChart3, Plus, Trash2, RefreshCw, Activity, Calendar, Database, Edit3, Music2, Share2, ArrowUp, ArrowDown, Bell, BellOff, Circle, Zap} from 'lucide-react'
 import './styles.css'
 
 function FacebookIcon({size=20}:{size?:number}) { return <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M13.5 22v-9h3l.45-3.5H13.5V7.26c0-1.01.28-1.7 1.73-1.7H17V2.43c-.31-.04-1.38-.13-2.62-.13-2.59 0-4.36 1.58-4.36 4.48V9.5H7v3.5h3.02v9h3.48z"/></svg> }
@@ -161,6 +155,65 @@ type ChatMessage = {
   created_at?: string
 }
 
+
+type ChatRealtimeEvent = {
+  type: 'message'|'thread'|'typing'|'presence'|'ping'
+  thread_id?: string
+  payload?: any
+}
+
+function useChatEventStream({
+  url,
+  enabled=true,
+  onEvent
+}:{
+  url:string
+  enabled?:boolean
+  onEvent:(event:ChatRealtimeEvent)=>void
+}) {
+  const callbackRef=React.useRef(onEvent)
+  React.useEffect(()=>{callbackRef.current=onEvent},[onEvent])
+
+  React.useEffect(()=>{
+    if(!enabled||!url)return
+    let source:EventSource|null=null
+    let retryTimer:number|undefined
+    let closed=false
+
+    const connect=()=>{
+      if(closed)return
+      source=new EventSource(url)
+      source.onmessage=(event)=>{
+        try{
+          callbackRef.current(JSON.parse(event.data))
+        }catch{}
+      }
+      source.onerror=()=>{
+        source?.close()
+        if(!closed)retryTimer=window.setTimeout(connect,2500)
+      }
+    }
+
+    connect()
+    return()=>{
+      closed=true
+      source?.close()
+      if(retryTimer)window.clearTimeout(retryTimer)
+    }
+  },[url,enabled])
+}
+
+function formatRelativeActivity(value?:string){
+  if(!value)return 'Offline'
+  const t=new Date(value).getTime()
+  if(!Number.isFinite(t))return 'Offline'
+  const seconds=Math.max(0,Math.round((Date.now()-t)/1000))
+  if(seconds<45)return 'Online now'
+  if(seconds<120)return 'Active 1 min ago'
+  if(seconds<3600)return `Active ${Math.round(seconds/60)} min ago`
+  return 'Offline'
+}
+
 const fallbackContent: Content = {
   candidateName: 'Prof. Philip Kaloki', campaignTitle: 'Makueni County • 2027', tagline: 'Development. Integrity. Prosperity.',
   strapline: 'Leadership that listens. Development that reaches every household.', phone: '+254 700 000 000',
@@ -289,6 +342,10 @@ function CampaignChatWidget({ content }: { content: Content }) {
   const [draft,setDraft]=React.useState('')
   const [busy,setBusy]=React.useState(false)
   const [error,setError]=React.useState('')
+  const [adminTyping,setAdminTyping]=React.useState(false)
+  const [adminActiveAt,setAdminActiveAt]=React.useState<string>('')
+  const [notifications,setNotifications]=React.useState(()=>localStorage.getItem('campaignChatNotifications')!=='off')
+  const typingTimer=React.useRef<number|undefined>(undefined)
 
   const loadMessages=React.useCallback(async()=>{
     if(!threadId)return
@@ -297,6 +354,7 @@ function CampaignChatWidget({ content }: { content: Content }) {
       const data=await r.json().catch(()=>({}))
       if(r.ok){
         setMessages(Array.isArray(data.messages)?data.messages:[])
+        if(data.thread?.admin_active_at)setAdminActiveAt(data.thread.admin_active_at)
       }else if(r.status===404){
         localStorage.removeItem('campaignChatThread')
         setThreadId('')
@@ -304,18 +362,58 @@ function CampaignChatWidget({ content }: { content: Content }) {
     }catch{}
   },[threadId])
 
+  const playNotification=React.useCallback(()=>{
+    if(!notifications)return
+    try{
+      const AudioCtx=(window.AudioContext||(window as any).webkitAudioContext)
+      if(!AudioCtx)return
+      const ctx=new AudioCtx()
+      const osc=ctx.createOscillator()
+      const gain=ctx.createGain()
+      osc.frequency.value=660
+      gain.gain.value=.025
+      osc.connect(gain);gain.connect(ctx.destination)
+      osc.start()
+      window.setTimeout(()=>{osc.stop();ctx.close()},130)
+    }catch{}
+  },[notifications])
+
+  useChatEventStream({
+    url:threadId?`/api/chat/${encodeURIComponent(threadId)}/stream`:'',
+    enabled:Boolean(threadId),
+    onEvent:event=>{
+      if(event.type==='message'&&event.payload){
+        setMessages(prev=>prev.some(x=>x.id===event.payload.id)?prev:[...prev,event.payload])
+        if(event.payload.sender==='admin'){
+          playNotification()
+          if(document.hidden&&'Notification' in window&&Notification.permission==='granted'){
+            new Notification('Campaign team replied',{body:String(event.payload.message||'New reply')})
+          }
+        }
+      }
+      if(event.type==='typing'&&event.payload?.sender==='admin')setAdminTyping(Boolean(event.payload.typing))
+      if(event.type==='presence'&&event.payload?.role==='admin')setAdminActiveAt(String(event.payload.active_at||''))
+      if(event.type==='thread'&&event.payload?.status==='closed'){}
+    }
+  })
+
   React.useEffect(()=>{
-    if(!open||!threadId)return
-    loadMessages()
-    const timer=window.setInterval(loadMessages,4000)
-    return()=>window.clearInterval(timer)
+    if(open&&threadId)loadMessages()
   },[open,threadId,loadMessages])
+
+  React.useEffect(()=>{
+    localStorage.setItem('campaignChatNotifications',notifications?'on':'off')
+  },[notifications])
+
+  const requestNotifications=async()=>{
+    if(!('Notification' in window))return
+    if(Notification.permission==='default')await Notification.requestPermission()
+  }
 
   const startChat=async(e:React.FormEvent<HTMLFormElement>)=>{
     e.preventDefault()
     if(!name.trim()||!phone.trim())return
-    setBusy(true)
-    setError('')
+    setBusy(true);setError('')
     try{
       const r=await fetch('/api/chat/start',{
         method:'POST',
@@ -332,20 +430,35 @@ function CampaignChatWidget({ content }: { content: Content }) {
       localStorage.setItem('campaignChatEmail',email.trim())
       setThreadId(id)
       setMessages(Array.isArray(data.messages)?data.messages:[])
+      requestNotifications()
     }catch(err){
       setError(err instanceof Error?err.message:'Could not start chat.')
-    }finally{
-      setBusy(false)
-    }
+    }finally{setBusy(false)}
+  }
+
+  const sendTyping=React.useCallback((typing:boolean)=>{
+    if(!threadId)return
+    fetch(`/api/chat/${encodeURIComponent(threadId)}/typing`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({sender:'visitor',typing})
+    }).catch(()=>{})
+  },[threadId])
+
+  const handleDraft=(value:string)=>{
+    setDraft(value)
+    sendTyping(Boolean(value.trim()))
+    if(typingTimer.current)window.clearTimeout(typingTimer.current)
+    typingTimer.current=window.setTimeout(()=>sendTyping(false),1500)
   }
 
   const sendMessage=async(e:React.FormEvent<HTMLFormElement>)=>{
     e.preventDefault()
     const text=draft.trim()
     if(!text||!threadId)return
-    setBusy(true)
-    setError('')
+    setBusy(true);setError('')
     try{
+      sendTyping(false)
       const r=await fetch(`/api/chat/${encodeURIComponent(threadId)}/messages`,{
         method:'POST',
         headers:{'Content-Type':'application/json','Accept':'application/json'},
@@ -354,12 +467,9 @@ function CampaignChatWidget({ content }: { content: Content }) {
       const data=await r.json().catch(()=>({}))
       if(!r.ok)throw new Error(String(data.error||'Could not send message.'))
       setDraft('')
-      await loadMessages()
     }catch(err){
       setError(err instanceof Error?err.message:'Could not send message.')
-    }finally{
-      setBusy(false)
-    }
+    }finally{setBusy(false)}
   }
 
   const newConversation=()=>{
@@ -371,27 +481,26 @@ function CampaignChatWidget({ content }: { content: Content }) {
   }
 
   return <>
-    <button
-      type="button"
-      className="campaign-chat-launcher"
-      onClick={()=>setOpen(true)}
-      aria-label="Open campaign chat"
-      title="Chat with the campaign"
-    >
-      <MessageCircle/>
-      <span>Chat</span>
+    <button type="button" className="campaign-chat-launcher" onClick={()=>setOpen(true)} aria-label="Open campaign chat">
+      <MessageCircle/><span>Chat</span>
     </button>
 
     {open&&<div className="campaign-chat-overlay" onMouseDown={e=>{if(e.target===e.currentTarget)setOpen(false)}}>
       <aside className="campaign-chat-panel" role="dialog" aria-modal="true" aria-label="Chat with the campaign">
         <div className="campaign-chat-head">
-          <div><strong>Chat with the campaign</strong><span>{content.candidateName} • Makueni County 2027</span></div>
-          <button type="button" onClick={()=>setOpen(false)} aria-label="Close chat"><X/></button>
+          <div>
+            <strong>Chat with the campaign</strong>
+            <span>{threadId?formatRelativeActivity(adminActiveAt):`${content.candidateName} • Makueni County 2027`}</span>
+          </div>
+          <div className="chat-head-actions">
+            <button type="button" onClick={()=>setNotifications(v=>!v)} title={notifications?'Mute chat notifications':'Enable chat notifications'}>{notifications?<Bell/>:<BellOff/>}</button>
+            <button type="button" onClick={()=>setOpen(false)} aria-label="Close chat"><X/></button>
+          </div>
         </div>
 
         {!threadId?
           <form className="campaign-chat-start" onSubmit={startChat}>
-            <p>Enter your details once, then type your message. The campaign team can reply from the Admin panel.</p>
+            <p>Enter your details once, then chat directly with the campaign team.</p>
             <label>Name<input value={name} onChange={e=>setName(e.target.value)} required autoComplete="name"/></label>
             <label>Phone<input value={phone} onChange={e=>setPhone(e.target.value)} required inputMode="tel" autoComplete="tel"/></label>
             <label>Email <small>(optional)</small><input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email"/></label>
@@ -407,9 +516,10 @@ function CampaignChatWidget({ content }: { content: Content }) {
                 <span>{msg.message}</span>
                 <small>{msg.created_at?new Date(msg.created_at).toLocaleString():''}</small>
               </div>)}
+              {adminTyping&&<div className="typing-indicator"><span/><span/><span/> Campaign team is typing…</div>}
             </div>
             <form className="campaign-chat-compose" onSubmit={sendMessage}>
-              <textarea value={draft} onChange={e=>setDraft(e.target.value)} placeholder="Type your message…" rows={2}/>
+              <textarea value={draft} onChange={e=>handleDraft(e.target.value)} placeholder="Type your message…" rows={2}/>
               <button type="submit" disabled={busy||!draft.trim()} aria-label="Send message"><ArrowRight/></button>
             </form>
             <div className="campaign-chat-foot">
@@ -1299,7 +1409,10 @@ function AdminMessagesManager({adminKey}:{adminKey:string}) {
   const [draft,setDraft]=React.useState('')
   const [busy,setBusy]=React.useState(false)
   const [error,setError]=React.useState('')
-
+  const [visitorTyping,setVisitorTyping]=React.useState(false)
+  const [visitorActiveAt,setVisitorActiveAt]=React.useState('')
+  const [notifications,setNotifications]=React.useState(()=>localStorage.getItem('adminChatNotifications')!=='off')
+  const typingTimer=React.useRef<number|undefined>(undefined)
   const headers={'x-admin-key':adminKey}
 
   const loadThreads=React.useCallback(async()=>{
@@ -1307,42 +1420,110 @@ function AdminMessagesManager({adminKey}:{adminKey:string}) {
     if(r.ok){
       const data=await r.json()
       setThreads(Array.isArray(data)?data:[])
+      if(active){
+        const found=(Array.isArray(data)?data:[]).find((x:ChatThread)=>x.id===active.id)
+        if(found)setActive(found)
+      }
     }
-  },[adminKey])
+  },[adminKey,active?.id])
 
-  const openThread=async(thread:ChatThread)=>{
+  const loadThread=React.useCallback(async(thread:ChatThread)=>{
     setError('')
-    setActive(thread)
     const r=await fetch(`/api/admin/chat/${thread.id}`,{headers})
     const data=await r.json().catch(()=>({}))
     if(r.ok){
       setMessages(Array.isArray(data.messages)?data.messages:[])
-      await fetch(`/api/admin/chat/${thread.id}/read`,{method:'POST',headers})
-      await loadThreads()
-    }else{
-      setError(String(data.error||'Unable to open conversation.'))
-    }
+      if(data.thread?.visitor_active_at)setVisitorActiveAt(data.thread.visitor_active_at)
+    }else setError(String(data.error||'Unable to open conversation.'))
+  },[adminKey])
+
+  const openThread=async(thread:ChatThread)=>{
+    setActive(thread)
+    await loadThread(thread)
+    await fetch(`/api/admin/chat/${thread.id}/read`,{method:'POST',headers})
+    await loadThreads()
   }
+
+  const playNotification=React.useCallback(()=>{
+    if(!notifications)return
+    try{
+      const AudioCtx=(window.AudioContext||(window as any).webkitAudioContext)
+      if(!AudioCtx)return
+      const ctx=new AudioCtx()
+      const osc=ctx.createOscillator()
+      const gain=ctx.createGain()
+      osc.frequency.value=540
+      gain.gain.value=.03
+      osc.connect(gain);gain.connect(ctx.destination)
+      osc.start()
+      window.setTimeout(()=>{osc.stop();ctx.close()},140)
+    }catch{}
+  },[notifications])
+
+  useChatEventStream({
+    url:'/api/admin/chat/stream',
+    enabled:true,
+    onEvent:event=>{
+      if(event.type==='thread'){
+        loadThreads()
+        if(event.payload?.unread_count>0){
+          playNotification()
+          if(document.hidden&&'Notification' in window&&Notification.permission==='granted'){
+            new Notification('New campaign chat message',{body:`Message from ${event.payload.visitor_name||'website visitor'}`})
+          }
+        }
+      }
+      if(active&&event.thread_id===active.id){
+        if(event.type==='message'&&event.payload){
+          setMessages(prev=>prev.some(x=>x.id===event.payload.id)?prev:[...prev,event.payload])
+          if(event.payload.sender==='visitor'){
+            fetch(`/api/admin/chat/${active.id}/read`,{method:'POST',headers}).catch(()=>{})
+            setVisitorActiveAt(new Date().toISOString())
+          }
+        }
+        if(event.type==='typing'&&event.payload?.sender==='visitor')setVisitorTyping(Boolean(event.payload.typing))
+        if(event.type==='presence'&&event.payload?.role==='visitor')setVisitorActiveAt(String(event.payload.active_at||''))
+      }
+    }
+  })
 
   React.useEffect(()=>{
     loadThreads()
-    const timer=window.setInterval(loadThreads,8000)
-    return()=>window.clearInterval(timer)
-  },[loadThreads])
+    if('Notification' in window&&Notification.permission==='default')Notification.requestPermission().catch(()=>{})
+  },[])
+
+  React.useEffect(()=>{localStorage.setItem('adminChatNotifications',notifications?'on':'off')},[notifications])
 
   React.useEffect(()=>{
     if(!active)return
-    const timer=window.setInterval(()=>openThread(active),5000)
+    fetch(`/api/admin/chat/${active.id}/presence`,{method:'POST',headers}).catch(()=>{})
+    const timer=window.setInterval(()=>fetch(`/api/admin/chat/${active.id}/presence`,{method:'POST',headers}).catch(()=>{}),15000)
     return()=>window.clearInterval(timer)
   },[active?.id])
+
+  const sendTyping=React.useCallback((typing:boolean)=>{
+    if(!active)return
+    fetch(`/api/admin/chat/${active.id}/typing`,{
+      method:'POST',
+      headers:{...headers,'Content-Type':'application/json'},
+      body:JSON.stringify({sender:'admin',typing})
+    }).catch(()=>{})
+  },[active?.id,adminKey])
+
+  const handleDraft=(value:string)=>{
+    setDraft(value)
+    sendTyping(Boolean(value.trim()))
+    if(typingTimer.current)window.clearTimeout(typingTimer.current)
+    typingTimer.current=window.setTimeout(()=>sendTyping(false),1500)
+  }
 
   const reply=async(e:React.FormEvent<HTMLFormElement>)=>{
     e.preventDefault()
     const text=draft.trim()
     if(!active||!text)return
-    setBusy(true)
-    setError('')
+    setBusy(true);setError('')
     try{
+      sendTyping(false)
       const r=await fetch(`/api/admin/chat/${active.id}/reply`,{
         method:'POST',
         headers:{...headers,'Content-Type':'application/json','Accept':'application/json'},
@@ -1351,12 +1532,9 @@ function AdminMessagesManager({adminKey}:{adminKey:string}) {
       const data=await r.json().catch(()=>({}))
       if(!r.ok)throw new Error(String(data.error||'Unable to send reply.'))
       setDraft('')
-      await openThread(active)
     }catch(err){
       setError(err instanceof Error?err.message:'Unable to send reply.')
-    }finally{
-      setBusy(false)
-    }
+    }finally{setBusy(false)}
   }
 
   const setStatus=async(status:'open'|'closed')=>{
@@ -1372,40 +1550,41 @@ function AdminMessagesManager({adminKey}:{adminKey:string}) {
     }
   }
 
-  return <div className="admin-chat-manager">
-    <section className="admin-chat-threads">
-      <div className="cms-records-head">
-        <div><h2>Messages</h2><span>{threads.length} conversations</span></div>
-        <button type="button" onClick={loadThreads}>Refresh</button>
-      </div>
+  const unreadTotal=threads.reduce((sum,t)=>sum+(Number(t.unread_count)||0),0)
 
-      {threads.length===0?
-        <div className="empty-state"><MessageCircle/><h3>No conversations yet</h3><p>Contact and website-chat conversations will appear here.</p></div>
-      :
+  return <div className="admin-chat-shell">
+    <div className="admin-chat-toolbar">
+      <div><Zap/><strong>Realtime messaging</strong><span>{unreadTotal} unread</span></div>
+      <button type="button" onClick={()=>setNotifications(v=>!v)}>{notifications?<Bell/>:<BellOff/>}{notifications?'Notifications on':'Notifications off'}</button>
+    </div>
+
+    <div className="admin-chat-manager">
+      <section className="admin-chat-threads">
+        <div className="cms-records-head">
+          <div><h2>Messages</h2><span>{threads.length} conversations</span></div>
+          <button type="button" onClick={loadThreads}>Refresh</button>
+        </div>
+        {threads.length===0?<div className="empty-state"><MessageCircle/><h3>No conversations yet</h3><p>Contact and website-chat conversations will appear here.</p></div>:
         <div className="thread-list">
           {threads.map(thread=><button type="button" key={thread.id} className={active?.id===thread.id?'active':''} onClick={()=>openThread(thread)}>
             <div><strong>{thread.visitor_name}</strong><span>{thread.visitor_phone}</span></div>
             <div>{thread.unread_count?<b>{thread.unread_count}</b>:null}<small>{thread.status}</small></div>
           </button>)}
         </div>}
-    </section>
+      </section>
 
-    <section className="admin-chat-conversation">
-      {!active?
-        <div className="empty-state"><MessageCircle/><h3>Select a conversation</h3><p>Choose a visitor on the left to read and reply.</p></div>
-      :
+      <section className="admin-chat-conversation">
+        {!active?<div className="empty-state"><MessageCircle/><h3>Select a conversation</h3><p>Choose a visitor on the left to read and reply.</p></div>:
         <>
           <div className="conversation-head">
             <div>
               <h3>{active.visitor_name}</h3>
+              <span className="presence-line"><Circle/> {formatRelativeActivity(visitorActiveAt)}</span>
               <a href={`tel:${active.visitor_phone.replace(/\s+/g,'')}`}>{active.visitor_phone}</a>
               {active.visitor_email&&<a href={`mailto:${active.visitor_email}`}>{active.visitor_email}</a>}
               <a className="admin-whatsapp-link" href={`https://wa.me/${active.visitor_phone.replace(/\D/g,'')}`} target="_blank" rel="noreferrer">Open in WhatsApp ↗</a>
             </div>
-            <div>
-              <span className={`status-pill ${active.status}`}>{active.status}</span>
-              <button type="button" onClick={()=>setStatus(active.status==='open'?'closed':'open')}>{active.status==='open'?'Close conversation':'Reopen conversation'}</button>
-            </div>
+            <div><span className={`status-pill ${active.status}`}>{active.status}</span><button type="button" onClick={()=>setStatus(active.status==='open'?'closed':'open')}>{active.status==='open'?'Close conversation':'Reopen conversation'}</button></div>
           </div>
 
           <div className="admin-chat-messages">
@@ -1415,19 +1594,18 @@ function AdminMessagesManager({adminKey}:{adminKey:string}) {
                 <small>{msg.sender==='admin'?'Campaign team':'Visitor'} • {msg.created_at?new Date(msg.created_at).toLocaleString():''}</small>
               </div>)
             }
+            {visitorTyping&&<div className="typing-indicator"><span/><span/><span/> Visitor is typing…</div>}
           </div>
 
           <form className="admin-chat-compose" onSubmit={reply}>
-            <textarea value={draft} onChange={e=>setDraft(e.target.value)} placeholder="Type your reply…" rows={3}/>
-            <button type="submit" className="btn primary" disabled={busy||!draft.trim()||active.status==='closed'}>
-              {busy?'Sending…':'Send reply'}
-            </button>
+            <textarea value={draft} onChange={e=>handleDraft(e.target.value)} placeholder="Type your reply…" rows={3}/>
+            <button type="submit" className="btn primary" disabled={busy||!draft.trim()||active.status==='closed'}>{busy?'Sending…':'Send reply'}</button>
           </form>
           {active.status==='closed'&&<div className="closed-chat-note">Reopen this conversation before sending another reply.</div>}
           {error&&<div className="chat-error admin">{error}</div>}
-        </>
-      }
-    </section>
+        </>}
+      </section>
+    </div>
   </div>
 }
 
@@ -1435,6 +1613,7 @@ function AdminPage({ content, setContent }: { content: Content; setContent: Reac
   const [key,setKey]=React.useState(sessionStorage.getItem('pk-admin-key')||'')
   const [logged,setLogged]=React.useState(false)
   const [tab,setTab]=React.useState<AdminTab>('dashboard')
+  const [chatUnread,setChatUnread]=React.useState(0)
   const [rows,setRows]=React.useState<Submission[]>([])
   const [cmsRows,setCmsRows]=React.useState<CmsRow[]>([])
   const [stats,setStats]=React.useState<Record<string,number>>({})
@@ -1488,7 +1667,24 @@ function AdminPage({ content, setContent }: { content: Content; setContent: Reac
     {label:'Events',value:stats.events||0,icon:<Calendar/>,tab:'events' as AdminTab},
     {label:'Media',value:stats.media_assets||0,icon:<ImageIcon/>,tab:'media' as AdminTab}
   ]
-  return <section className="admin-shell cms-v17"><aside className="admin-sidebar"><div className="brand"><span className="brand-mark">PK</span><span><strong>CAMPAIGN CMS</strong><small>SUPABASE • PHASE 32</small></span></div>
+
+  React.useEffect(()=>{
+    const source=new EventSource('/api/admin/chat/stream')
+    source.onmessage=(event)=>{
+      try{
+        const payload=JSON.parse(event.data)
+        if(payload.type==='thread'){
+          fetch('/api/admin/chat/threads',{headers:{'x-admin-key':key}})
+            .then(r=>r.ok?r.json():[])
+            .then(rows=>setChatUnread((Array.isArray(rows)?rows:[]).reduce((sum:number,row:any)=>sum+(Number(row.unread_count)||0),0)))
+            .catch(()=>{})
+        }
+      }catch{}
+    }
+    return()=>source.close()
+  },[key])
+
+  return <section className="admin-shell cms-v17"><aside className="admin-sidebar"><div className="brand"><span className="brand-mark">PK</span><span><strong>CAMPAIGN CMS</strong><small>SUPABASE • PHASE 33</small></span></div>
     <button type="button" className={tab==='dashboard'?'active':''} onClick={()=>changeTab('dashboard')}><LayoutDashboard/> Dashboard</button>
     <button type="button" className={tab==='inbox'?'active':''} onClick={()=>changeTab('inbox')}><Inbox/> Submissions</button>
     <button type="button" className={tab==='messages'?'active':''} onClick={()=>changeTab('messages')}><MessageCircle/> Messages</button>
