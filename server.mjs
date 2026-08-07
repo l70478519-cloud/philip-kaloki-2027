@@ -82,7 +82,33 @@ app.post('/api/admin/media/bulk-delete',adminOnly,async(req,res)=>{
   }
 })
 
-app.get('/api/admin/dashboard',adminOnly,async(_req,res)=>{try{const tables=['contact_submissions','volunteer_submissions','citizen_ideas','newsletter_subscribers','news_posts','events','media_assets','homepage_slides','event_images'];const result={};for(const table of tables){const{count,error}=await supabase.from(table).select('*',{count:'exact',head:true});if(error)throw error;result[table]=count||0}res.json(result)}catch(e){console.error(e);res.status(500).json({error:'Unable to load dashboard'})}})
+
+app.post('/api/admin/:kind/bulk-delete',adminOnly,async(req,res)=>{
+  try{
+    const map={news:'news_posts',events:'events',media:'media_assets'}
+    const table=map[req.params.kind]
+    if(!table)return res.status(400).json({error:'Unsupported bulk delete type'})
+    const ids=Array.isArray(req.body?.ids)?req.body.ids.filter(Boolean):[]
+    if(!ids.length)return res.status(400).json({error:'No items selected'})
+
+    if(req.params.kind==='news'){
+      await supabase.from('news_images').delete().in('news_id',ids)
+    }
+    if(req.params.kind==='events'){
+      await supabase.from('event_images').delete().in('event_id',ids)
+    }
+
+    const{error}=await supabase.from(table).delete().in('id',ids)
+    if(error)throw error
+    await audit(`${req.params.kind}_bulk_deleted`,table,null,{count:ids.length})
+    res.json({ok:true,count:ids.length})
+  }catch(e){
+    console.error(e)
+    res.status(500).json({error:'Unable to delete selected items'})
+  }
+})
+
+app.get('/api/admin/dashboard',adminOnly,async(_req,res)=>{try{const tables=['contact_submissions','volunteer_submissions','citizen_ideas','newsletter_subscribers','news_posts','events','media_assets','homepage_slides','event_images','news_images'];const result={};for(const table of tables){const{count,error}=await supabase.from(table).select('*',{count:'exact',head:true});if(error)throw error;result[table]=count||0}res.json(result)}catch(e){console.error(e);res.status(500).json({error:'Unable to load dashboard'})}})
 app.get('/api/admin/submissions',adminOnly,async(_req,res)=>{try{const qs=await Promise.all(['contact_submissions','volunteer_submissions','citizen_ideas','newsletter_subscribers'].map(t=>supabase.from(t).select('*').order('created_at',{ascending:false})));const err=qs.find(q=>q.error)?.error;if(err)throw err;const rows=[...(qs[0].data||[]).map(r=>normalize('contact',r)),...(qs[1].data||[]).map(r=>normalize('volunteer',r)),...(qs[2].data||[]).map(r=>normalize('idea',r)),...(qs[3].data||[]).map(r=>normalize('newsletter',r))].sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt));res.json(rows)}catch(e){console.error(e);res.status(500).json({error:'Unable to load submissions'})}})
 app.patch('/api/admin/submissions/:type/:id',adminOnly,async(req,res)=>{try{const map={contact:'contact_submissions',volunteer:'volunteer_submissions',idea:'citizen_ideas',newsletter:'newsletter_subscribers'},table=map[req.params.type];if(!table)return res.status(400).json({error:'Invalid type'});const status=['new','reviewed','closed'].includes(String(req.body.status))?String(req.body.status):'new';const{data,error}=await supabase.from(table).update({status}).eq('id',req.params.id).select().single();if(error)throw error;await audit('submission_status_changed',table,data.id,{status});res.json(normalize(req.params.type,data))}catch(e){console.error(e);res.status(500).json({error:'Unable to update submission'})}})
 app.put('/api/admin/content',adminOnly,async(req,res)=>{try{const p=clean(req.body),rows=Object.entries(p).map(([content_key,content_value])=>({content_key,content_value:String(content_value),updated_at:new Date().toISOString()}));const{error}=await supabase.from('campaign_content').upsert(rows,{onConflict:'content_key'});if(error)throw error;await audit('campaign_content_updated','campaign_content',null,{fields:Object.keys(p)});res.json(await contentObject())}catch(e){console.error(e);res.status(500).json({error:'Unable to save content'})}})
@@ -168,10 +194,69 @@ app.put('/api/admin/slides/:id',adminOnly,async(req,res)=>{const p=clean(req.bod
 app.delete('/api/admin/slides/:id',adminOnly,async(req,res)=>{const{error}=await supabase.from('homepage_slides').delete().eq('id',req.params.id);if(error)return res.status(500).json({error:error.message});await audit('slide_deleted','homepage_slides',req.params.id);res.json({ok:true})})
 app.post('/api/admin/slides/reorder',adminOnly,async(req,res)=>{try{const ids=Array.isArray(req.body?.ids)?req.body.ids:[];for(let i=0;i<ids.length;i++){const{error}=await supabase.from('homepage_slides').update({sort_order:i}).eq('id',ids[i]);if(error)throw error}await audit('slides_reordered','homepage_slides',null,{count:ids.length});res.json({ok:true})}catch(e){console.error(e);res.status(500).json({error:'Unable to reorder slides'})}})
 
+
+// Phase 25: unlimited news galleries
+app.get('/api/news/:slug/images',async(req,res)=>{
+  try{
+    const{data:post,error:postError}=await supabase.from('news_posts').select('id').eq('slug',req.params.slug).eq('published',true).maybeSingle()
+    if(postError)throw postError
+    if(!post)return res.json([])
+    const{data,error}=await supabase.from('news_images').select('*').eq('news_id',post.id).order('sort_order',{ascending:true}).order('created_at',{ascending:true})
+    if(error)throw error
+    res.json(data||[])
+  }catch(e){console.error(e);res.status(500).json({error:'Unable to load news gallery'})}
+})
+
+app.get('/api/admin/news/:id/images',adminOnly,async(req,res)=>{
+  const{data,error}=await supabase.from('news_images').select('*').eq('news_id',req.params.id).order('sort_order',{ascending:true}).order('created_at',{ascending:true})
+  res.status(error?500:200).json(error?{error:error.message}:data||[])
+})
+
+app.post('/api/admin/news/:id/images',adminOnly,upload.array('files',50),async(req,res)=>{
+  try{
+    const files=Array.isArray(req.files)?req.files:[]
+    if(!files.length)return res.status(400).json({error:'Choose one or more images'})
+    const{count}=await supabase.from('news_images').select('*',{count:'exact',head:true}).eq('news_id',req.params.id)
+    const rows=[]
+    for(let i=0;i<files.length;i++){
+      const stored=await uploadFileToCampaignMedia(files[i])
+      rows.push({
+        news_id:req.params.id,
+        image_url:stored.url,
+        caption:String(req.body?.caption||'').trim()||null,
+        sort_order:(count||0)+i
+      })
+    }
+    const{data,error}=await supabase.from('news_images').insert(rows).select()
+    if(error)throw error
+    await audit('news_gallery_uploaded','news_images',req.params.id,{count:files.length})
+    res.status(201).json(data||[])
+  }catch(e){console.error(e);res.status(500).json({error:'Unable to upload news photographs'})}
+})
+
+app.delete('/api/admin/news-images/:id',adminOnly,async(req,res)=>{
+  const{error}=await supabase.from('news_images').delete().eq('id',req.params.id)
+  if(error)return res.status(500).json({error:error.message})
+  await audit('news_image_deleted','news_images',req.params.id)
+  res.json({ok:true})
+})
+
+app.post('/api/admin/news/:id/images/reorder',adminOnly,async(req,res)=>{
+  try{
+    const ids=Array.isArray(req.body?.ids)?req.body.ids:[]
+    for(let i=0;i<ids.length;i++){
+      const{error}=await supabase.from('news_images').update({sort_order:i}).eq('id',ids[i]).eq('news_id',req.params.id)
+      if(error)throw error
+    }
+    await audit('news_gallery_reordered','news_images',req.params.id,{count:ids.length})
+    res.json({ok:true})
+  }catch(e){console.error(e);res.status(500).json({error:'Unable to reorder news gallery'})}
+})
+
 // Phase 21: unlimited event galleries
 app.get('/api/events/:id/images',async(req,res)=>{const{data,error}=await supabase.from('event_images').select('*').eq('event_id',req.params.id).order('sort_order',{ascending:true}).order('created_at',{ascending:true});res.status(error?500:200).json(error?{error:error.message}:data||[])})
 app.get('/api/admin/events/:id/images',adminOnly,async(req,res)=>{const{data,error}=await supabase.from('event_images').select('*').eq('event_id',req.params.id).order('sort_order',{ascending:true}).order('created_at',{ascending:true});res.status(error?500:200).json(error?{error:error.message}:data||[])})
-app.post('/api/admin/events/:id/images',adminOnly,upload.array('files',50),async(req,res)=>{try{const files=Array.isArray(req.files)?req.files:[];if(!files.length)return res.status(400).json({error:'Choose one or more images'});const{count}=await supabase.from('event_images').select('*',{count:'exact',head:true}).eq('event_id',req.params.id);const rows=[];for(let i=0;i<files.length;i++){const stored=await uploadFileToCampaignMedia(files[i]);rows.push({event_id:req.params.id,image_url:stored.url,sort_order:(count||0)+i})}const{data,error}=await supabase.from('event_images').insert(rows).select();if(error)throw error;await audit('event_gallery_uploaded','event_images',req.params.id,{count:files.length});res.status(201).json(data||[])}catch(e){console.error(e);res.status(500).json({error:'Unable to upload event photographs'})}})
+app.post('/api/admin/events/:id/images',adminOnly,upload.array('files',50),async(req,res)=>{try{const files=Array.isArray(req.files)?req.files:[];if(!files.length)return res.status(400).json({error:'Choose one or more images'});const{count}=await supabase.from('event_images').select('*',{count:'exact',head:true}).eq('event_id',req.params.id);const rows=[];for(let i=0;i<files.length;i++){const stored=await uploadFileToCampaignMedia(files[i]);rows.push({event_id:req.params.id,image_url:stored.url,caption:String(req.body?.caption||'').trim()||null,sort_order:(count||0)+i})}const{data,error}=await supabase.from('event_images').insert(rows).select();if(error)throw error;await audit('event_gallery_uploaded','event_images',req.params.id,{count:files.length});res.status(201).json(data||[])}catch(e){console.error(e);res.status(500).json({error:'Unable to upload event photographs'})}})
 app.delete('/api/admin/event-images/:id',adminOnly,async(req,res)=>{const{error}=await supabase.from('event_images').delete().eq('id',req.params.id);if(error)return res.status(500).json({error:error.message});await audit('event_image_deleted','event_images',req.params.id);res.json({ok:true})})
 app.post('/api/admin/events/:id/images/reorder',adminOnly,async(req,res)=>{try{const ids=Array.isArray(req.body?.ids)?req.body.ids:[];for(let i=0;i<ids.length;i++){const{error}=await supabase.from('event_images').update({sort_order:i}).eq('id',ids[i]).eq('event_id',req.params.id);if(error)throw error}await audit('event_gallery_reordered','event_images',req.params.id,{count:ids.length});res.json({ok:true})}catch(e){console.error(e);res.status(500).json({error:'Unable to reorder event gallery'})}})
 

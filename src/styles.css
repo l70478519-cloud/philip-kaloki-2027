@@ -178,3 +178,25 @@
   .selected-upload-preview{grid-template-columns:1fr}
   .cms-records-head{align-items:flex-start;flex-direction:column}
 }
+
+
+/* Phase 25 — compact admin grids and multi-gallery workflow */
+.slideshow-bulk-fields{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0}
+.slideshow-bulk-fields .multi-upload-panel{grid-column:1/-1}
+.slides-admin-list.compact{background:#fff;border:1px solid #dce5e1;border-radius:18px;padding:20px;margin-top:18px}
+.slides-admin-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:16px}
+.slides-admin-grid article{position:relative;display:flex;flex-direction:column;border:1px solid #dce5e1;border-radius:14px;overflow:hidden;background:#fff;min-width:0}
+.slides-admin-grid article.selected{outline:2px solid #14885d;background:#f1faf6}
+.slides-admin-grid article>img{width:100%;aspect-ratio:16/10;object-fit:cover;display:block}
+.slide-select{position:absolute;z-index:3;top:9px;left:9px;background:rgba(255,255,255,.92);border-radius:7px;padding:5px}
+.slide-card-copy{padding:12px;display:grid;gap:5px;flex:1}
+.slide-card-copy strong{color:#0b2f50;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slide-card-copy p{margin:0;color:#687584;font-size:12px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.slide-card-copy span{color:#0d8055;font-size:12px;font-weight:800}
+.slides-admin-grid .slide-admin-actions{display:grid;grid-template-columns:42px 42px 1fr 42px;gap:6px;padding:10px;border-top:1px solid #e4ebe7}
+.slides-admin-grid .slide-admin-actions button{min-height:36px}
+.gallery-after-save-note{display:flex;align-items:center;gap:10px;background:#f2f8f5;border:1px dashed #acd0bf;border-radius:12px;padding:12px;color:#46675a;font-size:13px}
+.media-batch-uploader label,.event-gallery-admin label{display:grid;gap:7px;margin:10px 0;color:#29465c;font-weight:700}
+.media-batch-uploader input,.media-batch-uploader textarea,.event-gallery-admin input{width:100%}
+@media(max-width:1050px){.slides-admin-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:680px){.slides-admin-grid{grid-template-columns:1fr}.slideshow-bulk-fields{grid-template-columns:1fr}}
