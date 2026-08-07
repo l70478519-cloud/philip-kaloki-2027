@@ -67,6 +67,21 @@ app.get('/api/content',async(_req,res)=>{try{res.setHeader('Cache-Control','publ
 
 app.post('/api/submissions/:type',rateLimit(60_000,8),async(req,res)=>{try{const type=req.params.type;if(!['contact','volunteer','idea','newsletter'].includes(type))return res.status(400).json({error:'Unsupported type'});if(bot(req.body))return res.status(201).json({ok:true});const p=clean(req.body);let table,record;if(type==='contact'){table='contact_submissions';record={full_name:p.fullName||p.name||'',email:p.email||'',phone:p.phone||'',subject:p.subject||'',message:p.message||'',ward:p.ward||''}}if(type==='volunteer'){table='volunteer_submissions';record={full_name:p.fullName||p.name||'',email:p.email||'',phone:p.phone||'',ward:p.ward||'',sub_county:p.subCounty||p.sub_county||'',interest:p.interest||'',message:p.message||''}}if(type==='idea'){table='citizen_ideas';record={full_name:p.fullName||p.name||'',email:p.email||'',phone:p.phone||'',ward:p.ward||'',category:p.category||'',idea:p.idea||p.message||''}}if(type==='newsletter'){table='newsletter_subscribers';record={email:p.email||'',full_name:p.fullName||p.name||''}}const{data,error}=await supabase.from(table).insert(record).select().single();if(error){if(type==='newsletter'&&error.code==='23505')return res.json({ok:true,alreadySubscribed:true});throw error}await audit('submission_created',table,data.id,{type});res.status(201).json({ok:true,id:data.id})}catch(e){console.error(e);res.status(500).json({error:'Unable to save submission'})}})
 
+
+app.post('/api/admin/media/bulk-delete',adminOnly,async(req,res)=>{
+  try{
+    const ids=Array.isArray(req.body?.ids)?req.body.ids.filter(Boolean):[]
+    if(!ids.length)return res.status(400).json({error:'No media items selected'})
+    const{error}=await supabase.from('media_assets').delete().in('id',ids)
+    if(error)throw error
+    await audit('media_bulk_deleted','media_assets',null,{count:ids.length})
+    res.json({ok:true,count:ids.length})
+  }catch(e){
+    console.error(e)
+    res.status(500).json({error:'Unable to delete selected media'})
+  }
+})
+
 app.get('/api/admin/dashboard',adminOnly,async(_req,res)=>{try{const tables=['contact_submissions','volunteer_submissions','citizen_ideas','newsletter_subscribers','news_posts','events','media_assets','homepage_slides','event_images'];const result={};for(const table of tables){const{count,error}=await supabase.from(table).select('*',{count:'exact',head:true});if(error)throw error;result[table]=count||0}res.json(result)}catch(e){console.error(e);res.status(500).json({error:'Unable to load dashboard'})}})
 app.get('/api/admin/submissions',adminOnly,async(_req,res)=>{try{const qs=await Promise.all(['contact_submissions','volunteer_submissions','citizen_ideas','newsletter_subscribers'].map(t=>supabase.from(t).select('*').order('created_at',{ascending:false})));const err=qs.find(q=>q.error)?.error;if(err)throw err;const rows=[...(qs[0].data||[]).map(r=>normalize('contact',r)),...(qs[1].data||[]).map(r=>normalize('volunteer',r)),...(qs[2].data||[]).map(r=>normalize('idea',r)),...(qs[3].data||[]).map(r=>normalize('newsletter',r))].sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt));res.json(rows)}catch(e){console.error(e);res.status(500).json({error:'Unable to load submissions'})}})
 app.patch('/api/admin/submissions/:type/:id',adminOnly,async(req,res)=>{try{const map={contact:'contact_submissions',volunteer:'volunteer_submissions',idea:'citizen_ideas',newsletter:'newsletter_subscribers'},table=map[req.params.type];if(!table)return res.status(400).json({error:'Invalid type'});const status=['new','reviewed','closed'].includes(String(req.body.status))?String(req.body.status):'new';const{data,error}=await supabase.from(table).update({status}).eq('id',req.params.id).select().single();if(error)throw error;await audit('submission_status_changed',table,data.id,{status});res.json(normalize(req.params.type,data))}catch(e){console.error(e);res.status(500).json({error:'Unable to update submission'})}})
@@ -198,6 +213,52 @@ app.get('/api/events/:id',async(req,res)=>{
 
 app.get('/api/news',async(_req,res)=>{const{data,error}=await supabase.from('news_posts').select('*').eq('published',true).order('published_at',{ascending:false});res.status(error?500:200).json(error?{error:error.message}:data||[])})
 app.get('/api/events',async(_req,res)=>{const{data,error}=await supabase.from('events').select('*').eq('published',true).order('event_date',{ascending:true});res.status(error?500:200).json(error?{error:error.message}:data||[])})
+
+
+app.get('/api/media-gallery',async(_req,res)=>{
+  try{
+    const [mediaR,eventR]=await Promise.all([
+      supabase.from('media_assets')
+        .select('id,file_url,thumbnail_url,title,description,asset_type,created_at')
+        .eq('published',true)
+        .eq('asset_type','photo')
+        .order('created_at',{ascending:false}),
+      supabase.from('event_images')
+        .select('id,image_url,caption,created_at')
+        .order('created_at',{ascending:false})
+    ])
+
+    const clean=(value='')=>{
+      const text=String(value||'').trim()
+      if(/^IMG[-_]/i.test(text)||/^\d{5,}$/.test(text))return ''
+      return text
+    }
+
+    const gallery=[
+      ...(mediaR.data||[]).map(x=>({
+        id:x.id,
+        image_url:x.thumbnail_url||x.file_url,
+        caption:clean(x.title)||'Campaign photograph',
+        description:x.description||'',
+        source:'media',
+        created_at:x.created_at
+      })),
+      ...(eventR.data||[]).map(x=>({
+        id:x.id,
+        image_url:x.image_url,
+        caption:clean(x.caption)||'Campaign event',
+        description:'',
+        source:'event',
+        created_at:x.created_at
+      }))
+    ].filter(x=>x.image_url && /^https?:\/\//.test(String(x.image_url)))
+
+    res.json(gallery)
+  }catch(e){
+    console.error(e)
+    res.status(500).json({error:'Unable to load media gallery'})
+  }
+})
 
 app.get('/api/gallery',async(_req,res)=>{try{const [a,b,c]=await Promise.all([supabase.from('homepage_slides').select('id,image_url,alt_text,created_at').eq('is_active',true).order('sort_order',{ascending:true}),supabase.from('media_assets').select('id,file_url,thumbnail_url,title,asset_type,created_at').eq('published',true).eq('asset_type','photo').order('created_at',{ascending:false}),supabase.from('event_images').select('id,image_url,caption,created_at').order('created_at',{ascending:false})]);const valid=v=>typeof v==='string'&&(v.startsWith('http://')||v.startsWith('https://')||v.startsWith('/'));const rows=[...(a.data||[]).map(x=>({id:x.id,image_url:x.image_url,caption:x.alt_text||'Campaign slideshow',source:'slideshow'})),...(b.data||[]).map(x=>({id:x.id,image_url:x.thumbnail_url||x.file_url,caption:x.title||'Campaign media',source:'media'})),...(c.data||[]).map(x=>({id:x.id,image_url:x.image_url,caption:x.caption||'Campaign event',source:'event'}))].filter(x=>valid(x.image_url));res.json(rows)}catch(e){console.error(e);res.status(500).json({error:'Unable to load gallery'})}})
 

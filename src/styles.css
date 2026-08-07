@@ -149,3 +149,32 @@
 .media-batch-uploader.staged{grid-column:1/-1}.selected-file-preview{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:14px}.selected-file-preview div{min-width:0}.selected-file-preview img{width:100%;height:90px;object-fit:cover;border-radius:9px;display:block}.selected-file-preview span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;margin-top:4px}.batch-actions{display:flex;gap:10px;margin-top:14px}.single-media-details{border-top:1px solid #e0e7e3;padding-top:15px;margin-top:16px}.single-media-details summary{cursor:pointer;color:#0b2f50;font-weight:800}.single-media-fields{display:grid;gap:12px;margin-top:14px}
 @media(max-width:900px){.media-feature-slideshow{height:380px}.public-photo-gallery.compact{grid-template-columns:repeat(2,1fr)}.selected-file-preview{grid-template-columns:repeat(3,1fr)}.media-resource-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:560px){.media-feature-slideshow{height:300px}.public-photo-gallery.compact{grid-template-columns:1fr}.selected-file-preview{grid-template-columns:repeat(2,1fr)}.media-resource-grid{grid-template-columns:1fr}}
+
+
+/* Phase 24 — media library, bulk actions, gallery separation */
+.bulk-media-uploader{border:1px solid #d8e5df;background:#f8fbf9;border-radius:16px;padding:18px;margin-bottom:18px}
+.bulk-media-uploader h3{margin:0;color:#0b2f50;font:700 22px 'Playfair Display'}
+.bulk-media-uploader p{margin:4px 0 12px;color:#6b7884}
+.selected-upload-preview{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:10px 0 14px}
+.selected-upload-preview>div{display:flex;gap:9px;align-items:center;padding:8px 10px;background:#fff;border:1px solid #dce7e2;border-radius:10px}
+.selected-upload-preview span{display:grid;place-items:center;width:24px;height:24px;border-radius:999px;background:#e8f5ef;color:#0d8055;font-weight:800}
+.selected-upload-preview strong{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.single-media-divider{display:flex;align-items:center;gap:10px;margin:20px 0;color:#7a8791;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}
+.single-media-divider:before,.single-media-divider:after{content:"";height:1px;background:#dce3e0;flex:1}
+.cms-records-head{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.cms-records-head>div:first-child{display:flex;align-items:center;gap:10px}
+.bulk-actions{display:flex;gap:8px;flex-wrap:wrap}
+.bulk-actions button{border:1px solid #d7e1dc;background:#fff;border-radius:9px;padding:8px 11px;font-weight:700;cursor:pointer}
+.bulk-actions .bulk-delete{display:flex;align-items:center;gap:6px;color:#b32929;background:#fff6f6;border-color:#f1caca}
+.bulk-actions .bulk-delete:disabled{opacity:.45;cursor:not-allowed}
+.cms-record{position:relative;padding-left:42px!important}
+.cms-record.selected{background:#f0faf5}
+.record-select{position:absolute;left:12px;top:22px}
+.record-select input{width:17px;height:17px}
+.public-photo-gallery{grid-template-columns:repeat(4,minmax(0,1fr));max-width:1100px;margin:0 auto}
+.public-photo-gallery a{aspect-ratio:4/3}
+.media-feature-slideshow{max-width:960px;margin:0 auto 46px}
+@media(max-width:760px){
+  .selected-upload-preview{grid-template-columns:1fr}
+  .cms-records-head{align-items:flex-start;flex-direction:column}
+}
