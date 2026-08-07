@@ -375,68 +375,41 @@ function EventsPage(){
 }
 
 
+function usableMediaUrl(value: unknown): value is string {
+  return typeof value === 'string' && (value.startsWith('https://') || value.startsWith('http://') || value.startsWith('/'))
+}
+
+function GallerySlideshow({items}:{items:any[]}) {
+  const pictures=items.filter(item=>usableMediaUrl(item.image_url)).slice(0,16)
+  const [active,setActive]=React.useState(0)
+  React.useEffect(()=>{
+    if(pictures.length<2)return
+    const timer=window.setInterval(()=>setActive(v=>(v+1)%pictures.length),4500)
+    return()=>window.clearInterval(timer)
+  },[pictures.length])
+  if(!pictures.length)return null
+  return <section className="media-feature-slideshow" aria-label="Featured campaign photographs">
+    {pictures.map((item,index)=><figure key={`${item.source}-${item.id}-${index}`} className={index===active?'active':''}>
+      <img src={item.image_url} alt={item.caption||`Campaign photograph ${index+1}`}/>
+      <figcaption>{item.caption||'Campaign moment'}</figcaption>
+    </figure>)}
+    {pictures.length>1&&<><button className="media-slide-prev" onClick={()=>setActive(v=>(v-1+pictures.length)%pictures.length)} aria-label="Previous photo">‹</button><button className="media-slide-next" onClick={()=>setActive(v=>(v+1)%pictures.length)} aria-label="Next photo">›</button><div className="media-slide-dots">{pictures.map((_,i)=><button key={i} className={i===active?'active':''} onClick={()=>setActive(i)} aria-label={`Show photo ${i+1}`}/>)}</div></>}
+  </section>
+}
+
 function MediaPage({ content }: { content: Content }) {
   const { data: media, loading } = useLiveApi<LiveMediaAsset[]>('/api/media', [])
   const { data: gallery } = useLiveApi<any[]>('/api/gallery', [])
+  const photos=gallery.filter((item:any)=>usableMediaUrl(item.image_url))
+  const resources=media.filter(item=>item.asset_type!=='photo' && usableMediaUrl(item.file_url))
 
-  return (
-    <main className="inner-page">
-      <section className="page-hero compact">
-        <div className="container">
-          <span className="section-kicker">Media Centre</span>
-          <h1>Campaign Media</h1>
-          <p>
-            Official photographs, campaign resources and public
-            communications from {content.candidateName}.
-          </p>
-        </div>
-      </section>
-
-      <section className="section gallery-section-public"><div className="container"><div className="section-heading"><span className="section-kicker">PHOTO GALLERY</span><h2>Campaign moments</h2><p>Photographs from campaign activities, events and the homepage slideshow.</p></div>{gallery.length>0&&<div className="public-photo-gallery">{gallery.map((item:any,index:number)=><a href={item.image_url} target="_blank" rel="noreferrer" key={`${item.source}-${item.id}-${index}`}><img src={item.image_url} alt={item.caption||`Campaign photograph ${index+1}`} loading="lazy"/><span>{item.caption||'Campaign photograph'}</span></a>)}</div>}</div></section>
-      <section className="section">
-        <div className="container">
-          {loading ? (
-            <div className="cms-empty public-empty">Loading media…</div>
-          ) : media.length === 0 ? (
-            <div className="cms-empty public-empty">
-              <ImageIcon/>
-              <h3>No published media yet</h3>
-              <p>
-                Media uploaded and published through the campaign CMS
-                will automatically appear here.
-              </p>
-            </div>
-          ) : (
-            <div className="live-media-grid">
-              {media.map(item => (
-                <article className="live-media-card" key={item.id}>
-                  {(item.thumbnail_url || item.file_url) && (
-                    <img
-                      src={item.thumbnail_url || item.file_url}
-                      alt={item.title || 'Campaign media'}
-                      loading="lazy"
-                    />
-                  )}
-                  <div>
-                    <span>{item.asset_type || 'Media'}</span>
-                    <h3>{item.title || 'Campaign Media'}</h3>
-                    {item.description && <p>{item.description}</p>}
-                    {item.file_url && (
-                      <a href={item.file_url} target="_blank" rel="noreferrer">
-                        View media →
-                      </a>
-                    )}
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-    </main>
-  )
+  return <main className="inner-page">
+    <section className="page-hero compact"><div className="container"><span className="section-kicker">Media Centre</span><h1>Campaign Media</h1><p>Official photographs, campaign resources and public communications from {content.candidateName}.</p></div></section>
+    <section className="section media-showcase"><div className="container"><div className="section-heading"><span className="section-kicker">FEATURED PHOTOS</span><h2>Campaign moments</h2><p>A rotating selection of recent campaign photographs.</p></div><GallerySlideshow items={photos}/></div></section>
+    <section className="section gallery-section-public"><div className="container"><div className="section-heading"><span className="section-kicker">PHOTO GALLERY</span><h2>Browse all photographs</h2><p>Event, media and homepage photographs in one compact gallery.</p></div>{photos.length===0?<div className="public-empty"><ImageIcon/><h3>No gallery photographs yet</h3></div>:<div className="public-photo-gallery compact">{photos.map((item:any,index:number)=><a href={item.image_url} target="_blank" rel="noreferrer" key={`${item.source}-${item.id}-${index}`}><img src={item.image_url} alt={item.caption||`Campaign photograph ${index+1}`} loading="lazy"/><span>{item.caption||'Campaign photograph'}</span></a>)}</div>}</div></section>
+    {resources.length>0&&<section className="section"><div className="container"><div className="section-heading"><span className="section-kicker">RESOURCES</span><h2>Videos & documents</h2></div><div className="media-resource-grid">{resources.map(item=><article key={item.id}><FileText/><div><strong>{item.title||'Campaign resource'}</strong>{item.description&&<p>{item.description}</p>}<a href={item.file_url} target="_blank" rel="noreferrer">Open resource →</a></div></article>)}</div></div></section>}
+  </main>
 }
-
 function ContactPage({ content }: { content: Content }) {
   const [state,setState] = React.useState('')
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); setState('sending'); const data = Object.fromEntries(new FormData(e.currentTarget)); try { await submit('contact', data); setState('sent'); e.currentTarget.reset() } catch { setState('error') } }
@@ -492,22 +465,19 @@ type AdminTab = 'dashboard'|'inbox'|'content'|'news'|'events'|'media'|'images'|'
 type CmsRow = Record<string, any> & { id: string }
 
 
-async function uploadAdminFile(file: File, key: string) {
+async function uploadAdminFile(file: File, key: string): Promise<string> {
   const body = new FormData()
   body.append('file', file)
-
   const response = await fetch('/api/admin/upload', {
     method: 'POST',
     headers: { 'x-admin-key': key },
     body
   })
-
-  if (!response.ok) {
-    const detail = await response.json().catch(() => ({}))
+  const detail = await response.json().catch(() => ({}))
+  if (!response.ok || !detail.url) {
     throw new Error(detail.error || 'Upload failed')
   }
-
-  return response.json() as Promise<{ ok: boolean; url: string; path: string }>
+  return String(detail.url)
 }
 
 
@@ -542,8 +512,8 @@ function AdminUploadField({
     setError('')
 
     try {
-      const result = await uploadAdminFile(file, adminKey)
-      setUrl(result.url)
+      const url = await uploadAdminFile(file, adminKey)
+      setUrl(url)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Upload failed')
     } finally {
@@ -581,7 +551,7 @@ function SiteImagesManager({ content, setContent, adminKey }: { content: Content
   const headers={'x-admin-key':adminKey,'Content-Type':'application/json'}
   const load=async()=>{const r=await fetch('/api/admin/slides',{headers:{'x-admin-key':adminKey}});if(r.ok)setSlides(await r.json())}
   React.useEffect(()=>{load()},[])
-  const addSlideFiles=async(e:React.ChangeEvent<HTMLInputElement>)=>{const files=Array.from(e.target.files||[]);if(!files.length)return;setBusy(true);let added=0;for(let i=0;i<files.length;i++){try{const url=await uploadAdminFile(files[i],adminKey);const r=await fetch('/api/admin/slides',{method:'POST',headers,body:JSON.stringify({image_url:url,alt_text:files[i].name.replace(/\.[^.]+$/,''),is_active:true,sort_order:slides.length+i})});if(r.ok)added++}catch{}}await load();setMessage(`${added} slideshow image${added===1?'':'s'} added.`);setBusy(false);e.target.value=''}
+  const addSlideFiles=async(e:React.ChangeEvent<HTMLInputElement>)=>{const files=Array.from(e.target.files||[]);if(!files.length)return;if(!window.confirm(`Add ${files.length} selected image${files.length===1?'':'s'} to the homepage slideshow?`)){e.target.value='';return}setBusy(true);let added=0;for(let i=0;i<files.length;i++){try{const url=await uploadAdminFile(files[i],adminKey);const r=await fetch('/api/admin/slides',{method:'POST',headers,body:JSON.stringify({image_url:url,alt_text:files[i].name.replace(/\.[^.]+$/,''),is_active:true,sort_order:slides.length+i})});if(r.ok)added++}catch{}}await load();setMessage(`${added} slideshow image${added===1?'':'s'} added.`);setBusy(false);e.target.value=''}
   const add=async(e:React.FormEvent<HTMLFormElement>)=>{e.preventDefault();setBusy(true);const data=Object.fromEntries(new FormData(e.currentTarget));const r=await fetch('/api/admin/slides',{method:'POST',headers,body:JSON.stringify({...data,is_active:true,sort_order:slides.length})});if(r.ok){e.currentTarget.reset();await load();setMessage('Slideshow image added.')}else setMessage('Could not add slideshow image.');setBusy(false)}
   const remove=async(id:string)=>{if(!confirm('Remove this slideshow image?'))return;await fetch(`/api/admin/slides/${id}`,{method:'DELETE',headers:{'x-admin-key':adminKey}});await load()}
   const toggle=async(slide:HomeSlide)=>{await fetch(`/api/admin/slides/${slide.id}`,{method:'PUT',headers,body:JSON.stringify({...slide,is_active:!slide.is_active})});await load()}
@@ -652,17 +622,27 @@ function EventGalleryAdmin({ eventId, adminKey }: { eventId: string; adminKey: s
   const [message,setMessage]=React.useState('')
   const load=async()=>{const r=await fetch(`/api/admin/events/${eventId}/images`,{headers:{'x-admin-key':adminKey}});if(r.ok)setImages(await r.json())}
   React.useEffect(()=>{load()},[eventId])
-  const upload=async(e:React.ChangeEvent<HTMLInputElement>)=>{const files=Array.from(e.target.files||[]);if(!files.length)return;setBusy(true);const body=new FormData();files.forEach(file=>body.append('files',file));const r=await fetch(`/api/admin/events/${eventId}/images`,{method:'POST',headers:{'x-admin-key':adminKey},body});if(r.ok){await load();setMessage(`${files.length} event photo${files.length===1?'':'s'} uploaded.`)}else setMessage('Event gallery upload failed.');setBusy(false);e.target.value=''}
+  const upload=async(e:React.ChangeEvent<HTMLInputElement>)=>{const files=Array.from(e.target.files||[]);if(!files.length)return;if(!window.confirm(`Add ${files.length} selected photo${files.length===1?'':'s'} to this event gallery?`)){e.target.value='';return}setBusy(true);const body=new FormData();files.forEach(file=>body.append('files',file));const r=await fetch(`/api/admin/events/${eventId}/images`,{method:'POST',headers:{'x-admin-key':adminKey},body});if(r.ok){await load();setMessage(`${files.length} event photo${files.length===1?'':'s'} uploaded.`)}else setMessage('Event gallery upload failed.');setBusy(false);e.target.value=''}
   const remove=async(id:string)=>{await fetch(`/api/admin/event-images/${id}`,{method:'DELETE',headers:{'x-admin-key':adminKey}});await load()}
   const reorder=async(index:number,direction:-1|1)=>{const target=index+direction;if(target<0||target>=images.length)return;const ordered=[...images];[ordered[index],ordered[target]]=[ordered[target],ordered[index]];const r=await fetch(`/api/admin/events/${eventId}/images/reorder`,{method:'POST',headers:{'Content-Type':'application/json','x-admin-key':adminKey},body:JSON.stringify({ids:ordered.map(i=>i.id)})});if(r.ok)await load()}
   return <section className="event-gallery-admin"><div className="cms-create-title"><ImageIcon/><div><h3>Event mini gallery</h3><p>Upload unlimited event photographs in batches. Visitors see them on this event's public page.</p></div></div><div className="event-gallery-upload"><input type="file" accept="image/*" multiple onChange={upload} disabled={busy}/><span>{busy?'Uploading…':'Select multiple photographs'}</span></div>{message&&<small>{message}</small>}<div className="event-gallery-admin-grid">{images.map((img,index)=><article key={img.id}><img src={img.image_url} alt=""/><div><button type="button" onClick={()=>reorder(index,-1)} disabled={index===0}><ArrowUp/></button><button type="button" onClick={()=>reorder(index,1)} disabled={index===images.length-1}><ArrowDown/></button><button type="button" className="danger-icon" onClick={()=>remove(img.id)}><Trash2/></button></div></article>)}</div></section>
 }
 
 
-function MediaBatchUploader({adminKey}:{adminKey:string}) {
-  const [busy,setBusy]=React.useState(false); const [message,setMessage]=React.useState('')
-  const upload=async(e:React.ChangeEvent<HTMLInputElement>)=>{const files=Array.from(e.target.files||[]);if(!files.length)return;setBusy(true);let ok=0;for(const file of files){try{const url=await uploadAdminFile(file,adminKey);const r=await fetch('/api/admin/media',{method:'POST',headers:{'Content-Type':'application/json','x-admin-key':adminKey},body:JSON.stringify({title:file.name.replace(/\.[^.]+$/,''),asset_type:'photo',file_url:url,thumbnail_url:url,description:'',published:true})});if(r.ok)ok++}catch{}}setMessage(`${ok} of ${files.length} photographs added to the media gallery.`);setBusy(false);e.target.value='';setTimeout(()=>location.reload(),900)}
-  return <div className="media-batch-uploader"><div><strong>Bulk photo upload</strong><p>Select several photographs at once. Each file becomes a published gallery item automatically.</p></div><input type="file" accept="image/*" multiple onChange={upload} disabled={busy}/>{message&&<small>{message}</small>}</div>
+function MediaBatchUploader({adminKey,onDone}:{adminKey:string;onDone?:()=>void}) {
+  const [files,setFiles]=React.useState<File[]>([])
+  const [busy,setBusy]=React.useState(false)
+  const [message,setMessage]=React.useState('')
+  const select=(e:React.ChangeEvent<HTMLInputElement>)=>{setFiles(Array.from(e.target.files||[]));setMessage('')}
+  const clear=()=>{setFiles([]);setMessage('')}
+  const publish=async()=>{
+    if(!files.length)return
+    if(!window.confirm(`Publish ${files.length} selected photo${files.length===1?'':'s'} to the public media gallery?`))return
+    setBusy(true);let ok=0
+    for(const file of files){try{const url=await uploadAdminFile(file,adminKey);const r=await fetch('/api/admin/media',{method:'POST',headers:{'Content-Type':'application/json','x-admin-key':adminKey},body:JSON.stringify({title:file.name.replace(/\.[^.]+$/,''),asset_type:'photo',file_url:url,thumbnail_url:url,description:'',published:true})});if(r.ok)ok++}catch{}}
+    setMessage(`${ok} of ${files.length} photographs published.`);setFiles([]);setBusy(false);onDone?.()
+  }
+  return <div className="media-batch-uploader staged"><div><strong>Bulk photo upload</strong><p>Select several photographs first. Nothing is published until you confirm.</p></div><input type="file" accept="image/*" multiple onChange={select} disabled={busy}/>{files.length>0&&<><div className="selected-file-preview">{files.slice(0,10).map((file,i)=><div key={`${file.name}-${i}`}><img src={URL.createObjectURL(file)} alt=""/><span>{file.name}</span></div>)}</div><div className="batch-actions"><button type="button" className="btn primary" onClick={publish} disabled={busy}>{busy?'Uploading…':`Publish ${files.length} selected`}</button><button type="button" className="cms-cancel" onClick={clear} disabled={busy}>Cancel</button></div></>}{message&&<small>{message}</small>}</div>
 }
 function CmsManager({
   kind,
@@ -689,6 +669,7 @@ function CmsManager({
 
   return (
     <div className="cms-manager">
+      {kind==='media'&&<MediaBatchUploader adminKey={adminKey}/>}
       <form
         key={editing?.id || `new-${kind}`}
         className="cms-create"
@@ -814,7 +795,7 @@ function CmsManager({
         )}
 
         {kind === 'media' && (
-          <>
+          <details className="single-media-details"><summary>Add one video, document, or image by URL (optional)</summary><div className="single-media-fields">
             {!editing && <MediaBatchUploader adminKey={adminKey}/>}
             <label>
               Title
@@ -855,7 +836,7 @@ function CmsManager({
               />
               Publish this media item
             </label>
-          </>
+          </div></details>
         )}
 
         {kind === 'events' && editing?.id && <EventGalleryAdmin eventId={editing.id} adminKey={adminKey}/>}
