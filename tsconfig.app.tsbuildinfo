@@ -1,1 +1,1 @@
-{"version":"7.0.2","errors":true,"root":[]}
+{"root":["./src/main.tsx","./src/vite-env.d.ts"],"version":"5.7.3"}

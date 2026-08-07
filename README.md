@@ -1,19 +1,5 @@
-# Prof. Philip Kaloki Professional Campaign Website
+# Prof. Philip Kaloki — Makueni County 2027
 
-## Run in GitHub Codespaces
+Combined professional campaign website through Phase 16.
 
-```bash
-npm install
-npm run dev
-```
-
-Open port **5173**.
-
-## Production build
-
-```bash
-npm run build
-npm run preview
-```
-
-The official portrait, telephone number, email, social links and approved campaign content should be updated before public launch.
+Run `npm install && npm run check` before starting development. Use `npm run api` and `npm run dev` in separate terminals in Codespaces. The next step is migrating content and submissions from JSON files to Supabase PostgreSQL.
