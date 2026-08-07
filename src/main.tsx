@@ -1,13 +1,15 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import {
-  ArrowRight, CalendarDays, CheckCircle2, ChevronUp, Droplets, Globe2 as Facebook,
+  ArrowRight, CalendarDays, CheckCircle2, ChevronUp, Droplets,
   HeartHandshake, Camera as Instagram, Landmark, Mail, MapPin, Menu, MessageCircle, Megaphone,
   Newspaper, Phone, PlayCircle, ShieldCheck, Sprout, Stethoscope, Target, FileText, Download,
   Users, X, PlayCircle as Youtube, BriefcaseBusiness, GraduationCap, LockKeyhole, LayoutDashboard,
   Inbox, Save, Home as HomeIcon, LogOut, Settings, Eye, Check, Clock3, ExternalLink, Image as ImageIcon, FileCheck2, BarChart3, Plus, Trash2, RefreshCw, Activity, Calendar, Database, Edit3, Music2, Share2, ArrowUp, ArrowDown
 } from 'lucide-react'
 import './styles.css'
+
+function FacebookIcon({size=20}:{size?:number}) { return <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M13.5 22v-9h3l.45-3.5H13.5V7.26c0-1.01.28-1.7 1.73-1.7H17V2.43c-.31-.04-1.38-.13-2.62-.13-2.59 0-4.36 1.58-4.36 4.48V9.5H7v3.5h3.02v9h3.48z"/></svg> }
 
 type Content = {
   candidateName: string
@@ -163,7 +165,7 @@ function validSocial(url?: string) {
 
 function SocialLinks({ content, compact = false }: { content: Content; compact?: boolean }) {
   const links = [
-    { url: content.facebook, label: 'Facebook', icon: <Facebook/> },
+    { url: content.facebook, label: 'Facebook', icon: <FacebookIcon/> },
     { url: content.twitter, label: 'X', icon: <X/> },
     { url: content.instagram, label: 'Instagram', icon: <Instagram/> },
     { url: content.tiktok, label: 'TikTok', icon: <Music2/> },
@@ -222,7 +224,7 @@ function Layout({ children, content }: { children: React.ReactNode; content: Con
       <div><h4>Quick links</h4><a href="/about">About</a><a href="/agenda">Development agenda</a><a href="/news">News & updates</a><a href="/media">Media centre</a><a href="/volunteer">Volunteer</a></div>
       <div><h4>Contact</h4><span>{content.office}</span><span>{content.phone}</span><span>{content.email}</span></div>
       <div><h4>Follow</h4><SocialLinks content={content}/></div>
-    </div><div className="container footer-bottom"><small>© 2027 Philip Kaloki Campaign.</small><small><a href="/privacy">Privacy</a> • <a href="/terms">Terms</a> • <a href="/accessibility">Accessibility</a> • <a href="/admin">Admin</a></small></div></footer>
+    </div><div className="container footer-bottom"><small>© 2027 Philip Kaloki Campaign.</small><small><a href="/privacy">Privacy</a> • <a href="/terms">Terms</a> • <a href="/accessibility">Accessibility</a></small></div></footer>
   </div>
 }
 
@@ -374,8 +376,8 @@ function EventsPage(){
 
 
 function MediaPage({ content }: { content: Content }) {
-  const { data: media, loading } =
-    useLiveApi<LiveMediaAsset[]>('/api/media', [])
+  const { data: media, loading } = useLiveApi<LiveMediaAsset[]>('/api/media', [])
+  const { data: gallery } = useLiveApi<any[]>('/api/gallery', [])
 
   return (
     <main className="inner-page">
@@ -390,6 +392,7 @@ function MediaPage({ content }: { content: Content }) {
         </div>
       </section>
 
+      <section className="section gallery-section-public"><div className="container"><div className="section-heading"><span className="section-kicker">PHOTO GALLERY</span><h2>Campaign moments</h2><p>Photographs from campaign activities, events and the homepage slideshow.</p></div>{gallery.length>0&&<div className="public-photo-gallery">{gallery.map((item:any,index:number)=><a href={item.image_url} target="_blank" rel="noreferrer" key={`${item.source}-${item.id}-${index}`}><img src={item.image_url} alt={item.caption||`Campaign photograph ${index+1}`} loading="lazy"/><span>{item.caption||'Campaign photograph'}</span></a>)}</div>}</div></section>
       <section className="section">
         <div className="container">
           {loading ? (
@@ -578,18 +581,19 @@ function SiteImagesManager({ content, setContent, adminKey }: { content: Content
   const headers={'x-admin-key':adminKey,'Content-Type':'application/json'}
   const load=async()=>{const r=await fetch('/api/admin/slides',{headers:{'x-admin-key':adminKey}});if(r.ok)setSlides(await r.json())}
   React.useEffect(()=>{load()},[])
+  const addSlideFiles=async(e:React.ChangeEvent<HTMLInputElement>)=>{const files=Array.from(e.target.files||[]);if(!files.length)return;setBusy(true);let added=0;for(let i=0;i<files.length;i++){try{const url=await uploadAdminFile(files[i],adminKey);const r=await fetch('/api/admin/slides',{method:'POST',headers,body:JSON.stringify({image_url:url,alt_text:files[i].name.replace(/\.[^.]+$/,''),is_active:true,sort_order:slides.length+i})});if(r.ok)added++}catch{}}await load();setMessage(`${added} slideshow image${added===1?'':'s'} added.`);setBusy(false);e.target.value=''}
   const add=async(e:React.FormEvent<HTMLFormElement>)=>{e.preventDefault();setBusy(true);const data=Object.fromEntries(new FormData(e.currentTarget));const r=await fetch('/api/admin/slides',{method:'POST',headers,body:JSON.stringify({...data,is_active:true,sort_order:slides.length})});if(r.ok){e.currentTarget.reset();await load();setMessage('Slideshow image added.')}else setMessage('Could not add slideshow image.');setBusy(false)}
   const remove=async(id:string)=>{if(!confirm('Remove this slideshow image?'))return;await fetch(`/api/admin/slides/${id}`,{method:'DELETE',headers:{'x-admin-key':adminKey}});await load()}
   const toggle=async(slide:HomeSlide)=>{await fetch(`/api/admin/slides/${slide.id}`,{method:'PUT',headers,body:JSON.stringify({...slide,is_active:!slide.is_active})});await load()}
   const move=async(index:number,direction:-1|1)=>{const target=index+direction;if(target<0||target>=slides.length)return;const ordered=[...slides];[ordered[index],ordered[target]]=[ordered[target],ordered[index]];const r=await fetch('/api/admin/slides/reorder',{method:'POST',headers,body:JSON.stringify({ids:ordered.map(s=>s.id)})});if(r.ok)await load()}
   const saveCovers=async(e:React.FormEvent<HTMLFormElement>)=>{e.preventDefault();setBusy(true);const data=Object.fromEntries(new FormData(e.currentTarget));const r=await fetch('/api/admin/content',{method:'PUT',headers,body:JSON.stringify(data)});if(r.ok){const next=await r.json();setContent(prev=>({...fallbackContent,...prev,...next}));setMessage('Cover and candidate images updated.')}else setMessage('Could not save cover images.');setBusy(false)}
-  return <div className="phase21-image-manager"><form className="site-images-manager" onSubmit={add}><div className="cms-create-title"><ImageIcon/><div><h2>Automatic homepage slideshow</h2><p>Add as many images as you want. Active images rotate every five seconds in the order shown below.</p></div></div><AdminUploadField name="image_url" label="New slideshow image" adminKey={adminKey} required/><label>Caption / alt text<input name="alt_text" placeholder="e.g. Meeting farmers in Makueni"/></label><button className="btn primary" disabled={busy}><Plus/> Add Image</button></form><div className="slides-admin-list"><div className="cms-records-head"><h2>Slideshow images</h2><span>{slides.length} images</span></div>{slides.length===0?<div className="empty-state"><ImageIcon/><h3>No database slides yet</h3><p>The homepage will keep using the Phase 20 fallback images until you add the first slide.</p></div>:slides.map((slide,index)=><article key={slide.id}><img src={slide.image_url} alt=""/><div><strong>{slide.alt_text||`Slideshow image ${index+1}`}</strong><span>{slide.is_active?'Active':'Hidden'}</span></div><div className="slide-admin-actions"><button onClick={()=>move(index,-1)} disabled={index===0} aria-label="Move up"><ArrowUp/></button><button onClick={()=>move(index,1)} disabled={index===slides.length-1} aria-label="Move down"><ArrowDown/></button><button onClick={()=>toggle(slide)}>{slide.is_active?'Hide':'Show'}</button><button className="danger-icon" onClick={()=>remove(slide.id)}><Trash2/></button></div></article>)}</div><form className="site-images-manager cover-manager" onSubmit={saveCovers}><div className="cms-create-title"><ImageIcon/><div><h2>Cover & candidate identity images</h2><p>Change the About page cover and the portrait shown on News/Event pages.</p></div></div><div className="site-image-grid"><AdminUploadField name="aboutImage" label="About / cover image" defaultValue={content.aboutImage} adminKey={adminKey}/><AdminUploadField name="candidateCardImage" label="News & event candidate portrait" defaultValue={content.candidateCardImage} adminKey={adminKey}/></div><button className="btn primary" disabled={busy}><Save/> Save Image Changes</button></form>{message&&<div className="admin-message">{message}</div>}</div>
+  return <div className="phase21-image-manager"><form className="site-images-manager" onSubmit={add}><div className="cms-create-title"><ImageIcon/><div><h2>Automatic homepage slideshow</h2><p>Add as many images as you want. Active images rotate every five seconds in the order shown below.</p></div></div><div className="multi-upload-panel"><label>Upload slideshow images in bulk<input type="file" accept="image/*" multiple onChange={addSlideFiles} disabled={busy}/></label><strong>{busy?'Uploading…':'Choose multiple images from your computer'}</strong></div><div className="or-divider">OR ADD ONE BY URL</div><AdminUploadField name="image_url" label="New slideshow image" adminKey={adminKey} required/><label>Caption / alt text<input name="alt_text" placeholder="e.g. Meeting farmers in Makueni"/></label><button className="btn primary" disabled={busy}><Plus/> Add Image</button></form><div className="slides-admin-list"><div className="cms-records-head"><h2>Slideshow images</h2><span>{slides.length} images</span></div>{slides.length===0?<div className="empty-state"><ImageIcon/><h3>No database slides yet</h3><p>The homepage will keep using the Phase 20 fallback images until you add the first slide.</p></div>:slides.map((slide,index)=><article key={slide.id}><img src={slide.image_url} alt=""/><div><strong>{slide.alt_text||`Slideshow image ${index+1}`}</strong><span>{slide.is_active?'Active':'Hidden'}</span></div><div className="slide-admin-actions"><button onClick={()=>move(index,-1)} disabled={index===0} aria-label="Move up"><ArrowUp/></button><button onClick={()=>move(index,1)} disabled={index===slides.length-1} aria-label="Move down"><ArrowDown/></button><button onClick={()=>toggle(slide)}>{slide.is_active?'Hide':'Show'}</button><button className="danger-icon" onClick={()=>remove(slide.id)}><Trash2/></button></div></article>)}</div><form className="site-images-manager cover-manager" onSubmit={saveCovers}><div className="cms-create-title"><ImageIcon/><div><h2>Cover & candidate identity images</h2><p>Change the About page cover and the portrait shown on News/Event pages.</p></div></div><div className="site-image-grid"><AdminUploadField name="aboutImage" label="About / cover image" defaultValue={content.aboutImage} adminKey={adminKey}/><AdminUploadField name="candidateCardImage" label="News & event candidate portrait" defaultValue={content.candidateCardImage} adminKey={adminKey}/></div><button className="btn primary" disabled={busy}><Save/> Save Image Changes</button></form>{message&&<div className="admin-message">{message}</div>}</div>
 }
 
 function SocialMediaManager({ content, setContent, adminKey }: { content: Content; setContent: React.Dispatch<React.SetStateAction<Content>>; adminKey: string }) {
   const [message,setMessage]=React.useState('')
   const save=async(e:React.FormEvent<HTMLFormElement>)=>{e.preventDefault();const data=Object.fromEntries(new FormData(e.currentTarget));const r=await fetch('/api/admin/content',{method:'PUT',headers:{'Content-Type':'application/json','x-admin-key':adminKey},body:JSON.stringify(data)});if(r.ok){const next=await r.json();setContent(prev=>({...fallbackContent,...prev,...next}));setMessage('Social media handles updated.')}else setMessage('Could not save social handles.')}
-  return <form className="social-admin-manager" onSubmit={save}><div className="cms-create-title"><Share2/><div><h2>Social media handles</h2><p>These links appear beside the leadership message and in the website footer.</p></div></div><div className="social-admin-grid"><label><Facebook/> Facebook<input name="facebook" defaultValue={content.facebook||''} placeholder="https://facebook.com/..."/></label><label><X/> X (Twitter)<input name="twitter" defaultValue={content.twitter||''} placeholder="https://x.com/..."/></label><label><Instagram/> Instagram<input name="instagram" defaultValue={content.instagram||''} placeholder="https://instagram.com/..."/></label><label><Music2/> TikTok<input name="tiktok" defaultValue={content.tiktok||''} placeholder="https://tiktok.com/@..."/></label><label><Youtube/> YouTube<input name="youtube" defaultValue={content.youtube||''} placeholder="https://youtube.com/@..."/></label></div><button className="btn primary"><Save/> Save Social Handles</button>{message&&<div className="admin-message">{message}</div>}</form>
+  return <form className="social-admin-manager" onSubmit={save}><div className="cms-create-title"><Share2/><div><h2>Social media handles</h2><p>These links appear beside the leadership message and in the website footer.</p></div></div><div className="social-admin-grid"><label><FacebookIcon/> Facebook<input name="facebook" defaultValue={content.facebook||''} placeholder="https://facebook.com/..."/></label><label><X/> X (Twitter)<input name="twitter" defaultValue={content.twitter||''} placeholder="https://x.com/..."/></label><label><Instagram/> Instagram<input name="instagram" defaultValue={content.instagram||''} placeholder="https://instagram.com/..."/></label><label><Music2/> TikTok<input name="tiktok" defaultValue={content.tiktok||''} placeholder="https://tiktok.com/@..."/></label><label><Youtube/> YouTube<input name="youtube" defaultValue={content.youtube||''} placeholder="https://youtube.com/@..."/></label></div><button className="btn primary"><Save/> Save Social Handles</button>{message&&<div className="admin-message">{message}</div>}</form>
 }
 
 function AdminPage({ content, setContent }: { content: Content; setContent: React.Dispatch<React.SetStateAction<Content>> }) {
@@ -618,7 +622,7 @@ function AdminPage({ content, setContent }: { content: Content; setContent: Reac
 
   const title={dashboard:'Command Dashboard',inbox:'Submission Inbox',content:'Official Website Content',news:'Newsroom Manager',events:'Events Manager',media:'Media Library',images:'Homepage Images',social:'Social Media',audit:'Audit Trail'}[tab]
   const statCards=[['Contacts',stats.contact_submissions||0,<Mail/>],['Volunteers',stats.volunteer_submissions||0,<Users/>],['Citizen ideas',stats.citizen_ideas||0,<MessageCircle/>],['Subscribers',stats.newsletter_subscribers||0,<Inbox/>],['News posts',stats.news_posts||0,<Newspaper/>],['Events',stats.events||0,<Calendar/>],['Media',stats.media_assets||0,<ImageIcon/>]]
-  return <section className="admin-shell cms-v17"><aside className="admin-sidebar"><div className="brand"><span className="brand-mark">PK</span><span><strong>CAMPAIGN CMS</strong><small>SUPABASE • PHASE 21</small></span></div>
+  return <section className="admin-shell cms-v17"><aside className="admin-sidebar"><div className="brand"><span className="brand-mark">PK</span><span><strong>CAMPAIGN CMS</strong><small>SUPABASE • PHASE 22</small></span></div>
     <button className={tab==='dashboard'?'active':''} onClick={()=>changeTab('dashboard')}><LayoutDashboard/> Dashboard</button>
     <button className={tab==='inbox'?'active':''} onClick={()=>changeTab('inbox')}><Inbox/> Submissions</button>
     <button className={tab==='content'?'active':''} onClick={()=>changeTab('content')}><Settings/> Website content</button>
@@ -654,6 +658,12 @@ function EventGalleryAdmin({ eventId, adminKey }: { eventId: string; adminKey: s
   return <section className="event-gallery-admin"><div className="cms-create-title"><ImageIcon/><div><h3>Event mini gallery</h3><p>Upload unlimited event photographs in batches. Visitors see them on this event's public page.</p></div></div><div className="event-gallery-upload"><input type="file" accept="image/*" multiple onChange={upload} disabled={busy}/><span>{busy?'Uploading…':'Select multiple photographs'}</span></div>{message&&<small>{message}</small>}<div className="event-gallery-admin-grid">{images.map((img,index)=><article key={img.id}><img src={img.image_url} alt=""/><div><button type="button" onClick={()=>reorder(index,-1)} disabled={index===0}><ArrowUp/></button><button type="button" onClick={()=>reorder(index,1)} disabled={index===images.length-1}><ArrowDown/></button><button type="button" className="danger-icon" onClick={()=>remove(img.id)}><Trash2/></button></div></article>)}</div></section>
 }
 
+
+function MediaBatchUploader({adminKey}:{adminKey:string}) {
+  const [busy,setBusy]=React.useState(false); const [message,setMessage]=React.useState('')
+  const upload=async(e:React.ChangeEvent<HTMLInputElement>)=>{const files=Array.from(e.target.files||[]);if(!files.length)return;setBusy(true);let ok=0;for(const file of files){try{const url=await uploadAdminFile(file,adminKey);const r=await fetch('/api/admin/media',{method:'POST',headers:{'Content-Type':'application/json','x-admin-key':adminKey},body:JSON.stringify({title:file.name.replace(/\.[^.]+$/,''),asset_type:'photo',file_url:url,thumbnail_url:url,description:'',published:true})});if(r.ok)ok++}catch{}}setMessage(`${ok} of ${files.length} photographs added to the media gallery.`);setBusy(false);e.target.value='';setTimeout(()=>location.reload(),900)}
+  return <div className="media-batch-uploader"><div><strong>Bulk photo upload</strong><p>Select several photographs at once. Each file becomes a published gallery item automatically.</p></div><input type="file" accept="image/*" multiple onChange={upload} disabled={busy}/>{message&&<small>{message}</small>}</div>
+}
 function CmsManager({
   kind,
   rows,
@@ -805,6 +815,7 @@ function CmsManager({
 
         {kind === 'media' && (
           <>
+            {!editing && <MediaBatchUploader adminKey={adminKey}/>}
             <label>
               Title
               <input name="title" required defaultValue={editing?.title || ''}/>
