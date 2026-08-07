@@ -335,3 +335,25 @@ a[href^="tel:"],a[href^="mailto:"],a[href^="https://wa.me"]{touch-action:manipul
   .campaign-chat-panel{right:14px;bottom:84px}
   .campaign-chat-launcher{right:14px;bottom:16px}
 }
+
+
+/* Phase 31 — responsive admin buttons + unified live messages */
+.admin-sidebar button,.admin-sidebar a{pointer-events:auto!important;cursor:pointer!important}
+.admin-sidebar button{appearance:none}
+.dashboard-stat{display:flex;flex-direction:column;align-items:flex-start;gap:14px;width:100%;min-height:150px;border:0;text-align:left;background:#fff;border-radius:18px;padding:20px;cursor:pointer;box-shadow:0 8px 24px rgba(12,42,65,.07);color:inherit}
+.dashboard-stat:hover{transform:translateY(-2px);box-shadow:0 14px 34px rgba(12,42,65,.12)}
+.dashboard-stat span:first-child{display:grid;place-items:center;width:38px;height:38px;border-radius:10px;background:#edf7f2;color:#0d8055}
+.dashboard-stat strong{font-size:30px;color:#0b2f50}
+.dashboard-stat small{font-weight:800;color:#667681}
+
+.chat-whatsapp-link,.admin-whatsapp-link{color:#0d8055;text-decoration:none;font-weight:800}
+.chat-whatsapp-link:hover,.admin-whatsapp-link:hover{text-decoration:underline}
+
+@media(max-width:760px){
+  .admin-sidebar{overflow-y:auto}
+  .admin-sidebar button,.admin-sidebar a{min-height:48px}
+  .cms-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:480px){
+  .cms-stat-grid{grid-template-columns:1fr}
+}

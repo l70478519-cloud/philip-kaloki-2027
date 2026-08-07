@@ -377,6 +377,7 @@ function CampaignChatWidget({ content }: { content: Content }) {
           <label>Phone<input value={phone} onChange={e=>setPhone(e.target.value)} required inputMode="tel"/></label>
           <label>Email <small>(optional)</small><input type="email" value={email} onChange={e=>setEmail(e.target.value)}/></label>
           <button type="submit" className="btn primary" disabled={busy}>{busy?'Starting…':'Start chat'}</button>
+          <a className="chat-whatsapp-link" href={whatsappUrl(content.whatsapp)} target="_blank" rel="noreferrer">Prefer WhatsApp? Open WhatsApp →</a>
           {error&&<div className="chat-error">{error}</div>}
         </form>
       :
@@ -413,7 +414,7 @@ function Layout({ children, content }: { children: React.ReactNode; content: Con
       <button className="menu" aria-label="Toggle navigation" onClick={() => setOpen(!open)}>{open ? <X/> : <Menu/>}</button>
     </div></header>
     <main id="main-content">{children}</main>
-    <a className="whatsapp" href={whatsappUrl(content.whatsapp)} target="_blank" rel="noreferrer" aria-label="Chat on WhatsApp"><MessageCircle/></a>
+    <CampaignChatWidget content={content}/>
     {showTop && <button className="back-top" onClick={() => window.scrollTo({top:0,behavior:'smooth'})}><ChevronUp/></button>}
     <footer><div className="container footer-main">
       <div><div className="brand footer-brand"><span className="brand-mark">PK</span><span><strong>{content.candidateName.toUpperCase()}</strong><small>{content.campaignTitle.toUpperCase()}</small></span></div><p>{content.tagline} for every household.</p></div>
@@ -723,25 +724,23 @@ function ContactPage({ content }: { content: Content }) {
 
   const onSubmit=async(e:React.FormEvent<HTMLFormElement>)=>{
     e.preventDefault()
-
     const form=e.currentTarget
-
     setState('sending')
     setErrorMessage('')
-
     const data=Object.fromEntries(new FormData(form))
 
     try{
-      await submit('contact',data)
-
+      const result=await submit('contact',data)
+      if(result.thread_id){
+        localStorage.setItem('campaignChatThread',String(result.thread_id))
+        localStorage.setItem('campaignChatName',String(data.name||''))
+        localStorage.setItem('campaignChatPhone',String(data.phone||''))
+        localStorage.setItem('campaignChatEmail',String(data.email||''))
+      }
       form.reset()
       setState('sent')
     }catch(error){
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : 'Unable to submit your message.'
-      )
+      setErrorMessage(error instanceof Error?error.message:'Unable to submit your message.')
       setState('error')
     }
   }
@@ -755,116 +754,54 @@ function ContactPage({ content }: { content: Content }) {
 
     <section className="section contact-section">
       <div className="container contact-grid">
-
         <div>
           <div className="contact-list">
-
-            <div>
-              <MapPin/>
-              <span>
-                <strong>Campaign Secretariat</strong>
-                <small>{content.office}</small>
-              </span>
-            </div>
-
-            <a href={`tel:${content.phone.replace(/\s+/g,'')}`}>
-              <Phone/>
-              <span>
-                <strong>Telephone</strong>
-                <small>{content.phone}</small>
-              </span>
-            </a>
-
-            <a href={`mailto:${content.email}`}>
-              <Mail/>
-              <span>
-                <strong>Email</strong>
-                <small>{content.email}</small>
-              </span>
-            </a>
-
+            <div><MapPin/><span><strong>Campaign Secretariat</strong><small>{content.office}</small></span></div>
+            <a href={`tel:${content.phone.replace(/\s+/g,'')}`}><Phone/><span><strong>Telephone</strong><small>{content.phone}</small></span></a>
+            <a href={`mailto:${content.email}`}><Mail/><span><strong>Email</strong><small>{content.email}</small></span></a>
           </div>
         </div>
 
         <form className="contact-form" onSubmit={onSubmit}>
-
           <div className="form-row">
-            <label>
-              Full name
-              <input name="name" required autoComplete="name"/>
-            </label>
-
-            <label>
-              Phone number
-              <input name="phone" required autoComplete="tel" inputMode="tel"/>
-            </label>
+            <label>Full name<input name="name" required autoComplete="name"/></label>
+            <label>Phone number<input name="phone" required autoComplete="tel" inputMode="tel"/></label>
           </div>
 
           <div className="form-row">
-
-            <label>
-              Email
-              <input name="email" type="email" autoComplete="email"/>
-            </label>
-
-            <label>
-              Subject
-              <select name="subject" required defaultValue="">
-                <option value="" disabled>Select one</option>
-                <option>General enquiry</option>
-                <option>Media request</option>
-                <option>Event invitation</option>
-                <option>Development proposal</option>
-                <option>Partnership</option>
-              </select>
-            </label>
-
+            <label>Email<input name="email" type="email" autoComplete="email"/></label>
+            <label>Subject<select name="subject" required defaultValue="">
+              <option value="" disabled>Select one</option>
+              <option>General enquiry</option>
+              <option>Media request</option>
+              <option>Event invitation</option>
+              <option>Development proposal</option>
+              <option>Partnership</option>
+            </select></label>
           </div>
 
-          <label>
-            Your message
-            <textarea name="message" required rows={6}/>
-          </label>
+          <label>Your message<textarea name="message" required rows={6}/></label>
+          <input className="hp-field" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true"/>
 
-          <input
-            className="hp-field"
-            name="website"
-            tabIndex={-1}
-            autoComplete="off"
-            aria-hidden="true"
-          />
-
-          <button
-            type="submit"
-            className="btn primary submit"
-            disabled={state==='sending'}
-          >
-            {state==='sending' ? 'Sending…' : 'Send Message'}
-            <ArrowRight size={18}/>
+          <button type="submit" className="btn primary submit" disabled={state==='sending'}>
+            {state==='sending'?'Sending…':'Send Message'} <ArrowRight size={18}/>
           </button>
 
-          {state==='sent'&&
-            <div className="success">
-              <strong>Message received.</strong>
-              <span>Your message has been saved successfully. The campaign team can review it from the Admin dashboard.</span>
-            </div>
-          }
+          {state==='sent'&&<div className="success">
+            <strong>Message received.</strong>
+            <span>Your message has been saved successfully. You can continue the conversation using the green chat button.</span>
+          </div>}
 
-          {state==='error'&&
-            <div className="form-error">
-              <strong>Could not submit your message.</strong>
-              <span>{errorMessage}</span>
-              <small>Please try again or contact the campaign by phone, email or chat.</small>
-            </div>
-          }
-
+          {state==='error'&&<div className="form-error">
+            <strong>Could not submit your message.</strong>
+            <span>{errorMessage}</span>
+            <small>Please try again or contact the campaign by phone, email or chat.</small>
+          </div>}
         </form>
-
       </div>
     </section>
   </>
 }
-
 function VolunteerPage() {
   const [state,setState]=React.useState<'idle'|'sending'|'sent'|'error'>('idle')
   const [errorMessage,setErrorMessage]=React.useState('')
@@ -1002,7 +939,7 @@ function updateSeo(path: string, content: Content) {
   if(canonical) canonical.href=window.location.origin+path
 }
 
-type AdminTab = 'dashboard'|'inbox'|'content'|'news'|'events'|'media'|'images'|'social'|'audit' | 'messages'
+type AdminTab = 'dashboard'|'inbox'|'content'|'news'|'events'|'media'|'images'|'social'|'audit'|'messages'
 type CmsRow = Record<string, any> & { id: string }
 
 
@@ -1414,7 +1351,7 @@ function AdminMessagesManager({adminKey}:{adminKey:string}) {
       {!active?<div className="empty-state"><MessageCircle/><h3>Select a conversation</h3><p>Open a visitor conversation to view details and reply.</p></div>:
       <>
         <div className="conversation-head">
-          <div><h3>{active.visitor_name}</h3><a href={`tel:${active.visitor_phone.replace(/\s+/g,'')}`}>{active.visitor_phone}</a>{active.visitor_email&&<a href={`mailto:${active.visitor_email}`}>{active.visitor_email}</a>}</div>
+          <div><h3>{active.visitor_name}</h3><a href={`tel:${active.visitor_phone.replace(/\s+/g,'')}`}>{active.visitor_phone}</a>{active.visitor_email&&<a href={`mailto:${active.visitor_email}`}>{active.visitor_email}</a>}<a className="admin-whatsapp-link" href={`https://wa.me/${active.visitor_phone.replace(/\D/g,'')}`} target="_blank" rel="noreferrer">Open WhatsApp ↗</a></div>
           <div><span className={`status-pill ${active.status}`}>{active.status}</span><button type="button" onClick={()=>setStatus(active.status==='open'?'closed':'open')}>{active.status==='open'?'Close':'Reopen'}</button></div>
         </div>
         <div className="admin-chat-messages">
@@ -1453,21 +1390,31 @@ function AdminPage({ content, setContent }: { content: Content; setContent: Reac
 
   if(!logged) return <section className="admin-shell"><div className="admin-login"><LockKeyhole/><h1>Campaign Admin</h1><p>Secure content management for the Philip Kaloki campaign website.</p><form onSubmit={login}><input type="password" value={key} onChange={e=>setKey(e.target.value)} placeholder="Admin key"/><button className="btn primary">Sign in</button></form>{message&&<div className="form-error">{message}</div>}<a href="/">← Back to website</a></div></section>
 
-  const title={dashboard:'Command Dashboard',inbox:'Submission Inbox',messages:'Messages',content:'Official Website Content',news:'Newsroom Manager',events:'Events Manager',media:'Media Library',images:'Homepage Images',social:'Social Media',audit:'Audit Trail'}[tab]
-  const statCards=[['Contacts',stats.contact_submissions||0,<Mail/>],['Volunteers',stats.volunteer_submissions||0,<Users/>],['Citizen ideas',stats.citizen_ideas||0,<MessageCircle/>],['Subscribers',stats.newsletter_subscribers||0,<Inbox/>],['News posts',stats.news_posts||0,<Newspaper/>],['Events',stats.events||0,<Calendar/>],['Media',stats.media_assets||0,<ImageIcon/>]]
-  return <section className="admin-shell cms-v17"><aside className="admin-sidebar"><div className="brand"><span className="brand-mark">PK</span><span><strong>CAMPAIGN CMS</strong><small>SUPABASE • PHASE 30</small></span></div>
-    <button className={tab==='dashboard'?'active':''} onClick={()=>changeTab('dashboard')}><LayoutDashboard/> Dashboard</button>
-    <button className={tab==='inbox'?'active':''} onClick={()=>changeTab('inbox')}><Inbox/> Submissions</button>
-    <button className={tab==='content'?'active':''} onClick={()=>changeTab('content')}><Settings/> Website content</button>
-    <button className={tab==='news'?'active':''} onClick={()=>changeTab('news')}><Newspaper/> News</button>
-    <button className={tab==='events'?'active':''} onClick={()=>changeTab('events')}><Calendar/> Events</button>
-    <button className={tab==='media'?'active':''} onClick={()=>changeTab('media')}><ImageIcon/> Media</button>
-    <button className={tab==='images'?'active':''} onClick={()=>changeTab('images')}><ImageIcon/> Homepage images</button>
-    <button className={tab==='social'?'active':''} onClick={()=>changeTab('social')}><Share2/> Social media</button>
-    <button className={tab==='audit'?'active':''} onClick={()=>changeTab('audit')}><Activity/> Audit log</button>
-    <a href="/"><Eye/> View website</a><button onClick={()=>{sessionStorage.removeItem('pk-admin-key');location.reload()}}><LogOut/> Sign out</button></aside>
-    <div className="admin-main"><div className="admin-top"><div><span>CAMPAIGN SECRETARIAT</span><h1>{title}</h1></div><button className="admin-refresh" onClick={()=>changeTab(tab)}><RefreshCw/> Refresh</button></div>{message&&<div className="admin-message">{message}</div>}
-    {tab==='dashboard'&&<><div className="cms-stat-grid">{statCards.map(([label,value,icon])=><article key={String(label)}><span>{icon as React.ReactNode}</span><strong>{String(value)}</strong><small>{String(label)}</small></article>)}</div><div className="cms-welcome"><Database/><div><h2>Supabase CMS connected</h2><p>Website content, enquiries, volunteer records, news, events, media records and audit activity are managed from one production database.</p></div></div></>}
+  const title={dashboard:'Command Dashboard',inbox:'Submission Inbox',content:'Official Website Content',news:'Newsroom Manager',events:'Events Manager',media:'Media Library',images:'Homepage Images',social:'Social Media',audit:'Audit Trail',messages:'Messages'}[tab]
+  const statCards=[
+    {label:'Contacts',value:stats.contact_submissions||0,icon:<Mail/>,tab:'inbox' as AdminTab},
+    {label:'Volunteers',value:stats.volunteer_submissions||0,icon:<Users/>,tab:'inbox' as AdminTab},
+    {label:'Citizen ideas',value:stats.citizen_ideas||0,icon:<MessageCircle/>,tab:'inbox' as AdminTab},
+    {label:'Subscribers',value:stats.newsletter_subscribers||0,icon:<Inbox/>,tab:'inbox' as AdminTab},
+    {label:'Messages',value:stats.chat_threads||0,icon:<MessageCircle/>,tab:'messages' as AdminTab},
+    {label:'News posts',value:stats.news_posts||0,icon:<Newspaper/>,tab:'news' as AdminTab},
+    {label:'Events',value:stats.events||0,icon:<Calendar/>,tab:'events' as AdminTab},
+    {label:'Media',value:stats.media_assets||0,icon:<ImageIcon/>,tab:'media' as AdminTab}
+  ]
+  return <section className="admin-shell cms-v17"><aside className="admin-sidebar"><div className="brand"><span className="brand-mark">PK</span><span><strong>CAMPAIGN CMS</strong><small>SUPABASE • PHASE 31</small></span></div>
+    <button type="button" className={tab==='dashboard'?'active':''} onClick={()=>changeTab('dashboard')}><LayoutDashboard/> Dashboard</button>
+    <button type="button" className={tab==='inbox'?'active':''} onClick={()=>changeTab('inbox')}><Inbox/> Submissions</button>
+    <button type="button" className={tab==='messages'?'active':''} onClick={()=>changeTab('messages')}><MessageCircle/> Messages</button>
+    <button type="button" className={tab==='content'?'active':''} onClick={()=>changeTab('content')}><Settings/> Website content</button>
+    <button type="button" className={tab==='news'?'active':''} onClick={()=>changeTab('news')}><Newspaper/> News</button>
+    <button type="button" className={tab==='events'?'active':''} onClick={()=>changeTab('events')}><Calendar/> Events</button>
+    <button type="button" className={tab==='media'?'active':''} onClick={()=>changeTab('media')}><ImageIcon/> Media</button>
+    <button type="button" className={tab==='images'?'active':''} onClick={()=>changeTab('images')}><ImageIcon/> Homepage images</button>
+    <button type="button" className={tab==='social'?'active':''} onClick={()=>changeTab('social')}><Share2/> Social media</button>
+    <button type="button" className={tab==='audit'?'active':''} onClick={()=>changeTab('audit')}><Activity/> Audit log</button>
+    <a href="/"><Eye/> View website</a><button type="button" onClick={()=>{sessionStorage.removeItem('pk-admin-key');location.reload()}}><LogOut/> Sign out</button></aside>
+    <div className="admin-main"><div className="admin-top"><div><span>CAMPAIGN SECRETARIAT</span><h1>{title}</h1></div><button type="button" className="admin-refresh" onClick={()=>changeTab(tab)}><RefreshCw/> Refresh</button></div>{message&&<div className="admin-message">{message}</div>}
+    {tab==='dashboard'&&<><div className="cms-stat-grid">{statCards.map(card=><button type="button" className="dashboard-stat" key={card.label} onClick={()=>changeTab(card.tab)}><span>{card.icon}</span><strong>{String(card.value)}</strong><small>{card.label}</small></button>)}</div><div className="cms-welcome"><Database/><div><h2>Supabase CMS connected</h2><p>Website content, enquiries, volunteer records, news, events, media records and audit activity are managed from one production database.</p></div></div></>}
     {tab==='messages'&&<AdminMessagesManager adminKey={key}/>}
         {tab==='inbox'&&<div className="submission-list">{rows.length===0?<div className="empty-state"><Inbox/><h3>No submissions yet</h3><p>Website submissions will appear here.</p></div>:rows.map(r=><article key={r.id}><div className="submission-head"><span className={`status ${r.status}`}>{r.status==='new'?<Clock3/>:<Check/>}{r.status}</span><strong>{(r.type||'submission').toUpperCase()}</strong><small>{new Date(r.createdAt).toLocaleString()}</small></div><h3>{r.name||r.email||'Website submission'}</h3><p>{r.message||r.subject||r.interest||'Newsletter subscription'}</p><div className="submission-meta">{Object.entries(r).filter(([k])=>!['id','type','createdAt','status','message'].includes(k)).slice(0,7).map(([k,v])=><span key={k}><b>{k}:</b> {String(v||'—')}</span>)}</div><div className="cms-actions"><button onClick={()=>changeStatus(r,'reviewed')}>Reviewed</button><button onClick={()=>changeStatus(r,'closed')}>Close</button></div></article>)}</div>}
     {tab==='content'&&<form className="admin-content-form cms-content" onSubmit={saveContent}>{Object.entries(content).map(([k,v])=><label key={k}>{k}<textarea name={k} defaultValue={v||''} rows={k==='biography'||k==='heroText'?4:2}/></label>)}<button disabled={busy} className="btn primary"><Save/> {busy?'Saving…':'Save Official Content'}</button></form>}

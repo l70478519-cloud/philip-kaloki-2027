@@ -62,7 +62,7 @@ async function audit(action,entity_type,entity_id=null,details={}){const{error}=
 async function contentObject(){const{data,error}=await supabase.from('campaign_content').select('content_key,content_value');if(error)throw error;return Object.fromEntries((data||[]).map(r=>[r.content_key,r.content_value??'']))}
 function normalize(type,row){return{id:row.id,type,createdAt:row.created_at,status:row.status||'new',name:row.full_name||'',email:row.email||'',phone:row.phone||'',ward:row.ward||'',subCounty:row.sub_county||'',subject:row.subject||'',message:row.message||row.idea||'',interest:row.interest||'',category:row.category||''}}
 
-app.get('/api/health',async(_req,res)=>{const{error}=await supabase.from('campaign_content').select('id').limit(1);res.status(error?503:200).json({status:error?'error':'ok',service:'philip-kaloki-website-api',storage:'supabase-postgresql',phase:'phase-30'})})
+app.get('/api/health',async(_req,res)=>{const{error}=await supabase.from('campaign_content').select('id').limit(1);res.status(error?503:200).json({status:error?'error':'ok',service:'philip-kaloki-website-api',storage:'supabase-postgresql',phase:'phase-31'})})
 app.get('/api/content',async(_req,res)=>{try{res.setHeader('Cache-Control','public,max-age=60');res.json(await contentObject())}catch(e){console.error(e);res.status(500).json({error:'Unable to load content'})}})
 
 app.post('/api/submissions/:type',rateLimit(60_000,20),async(req,res)=>{
@@ -158,7 +158,32 @@ app.post('/api/submissions/:type',rateLimit(60_000,20),async(req,res)=>{
     }
 
     await audit('submission_created',table,data.id,{type})
-    return res.status(201).json({ok:true,id:data.id,type})
+
+    let thread_id=null
+    if(type==='contact'){
+      try{
+        const{data:thread,error:threadError}=await supabase.from('chat_threads').insert({
+          visitor_name:record.full_name,
+          visitor_phone:record.phone,
+          visitor_email:record.email||null,
+          status:'open',
+          unread_count:1
+        }).select('*').single()
+
+        if(!threadError&&thread){
+          thread_id=thread.id
+          await supabase.from('chat_messages').insert({
+            thread_id:thread.id,
+            sender:'visitor',
+            message:`${record.subject||'General enquiry'}\n\n${record.message}`
+          })
+        }
+      }catch(chatError){
+        console.error('contact chat mirror',chatError)
+      }
+    }
+
+    return res.status(201).json({ok:true,id:data.id,type,thread_id})
   }catch(error){
     console.error('public submission:',error)
     return res.status(500).json({
