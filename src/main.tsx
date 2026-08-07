@@ -229,7 +229,7 @@ function Layout({ children, content }: { children: React.ReactNode; content: Con
   const links = [['/','Home'],['/about','About'],['/agenda','Agenda'],['/news','News'],['/events','Events'],['/media','Media'],['/contact','Contact']]
   return <div>
     <a className="skip-link" href="#main-content">Skip to main content</a>
-    <div className="topbar"><div className="container topbar-inner"><div className="topbar-message"><span>{content.strapline}</span><SocialLinks content={content} compact/></div><div className="topbar-contact"><Phone size={15}/> {content.phone} <Mail size={15}/> {content.email}</div></div></div>
+    <div className="topbar"><div className="container topbar-inner"><div className="topbar-message"><span>{content.strapline}</span><SocialLinks content={content} compact/></div><div className="topbar-contact"><a href={`tel:${content.phone.replace(/\s+/g,'')}`}><Phone size={15}/> {content.phone}</a><a href={`mailto:${content.email}`}><Mail size={15}/> {content.email}</a></div></div></div>
     <header className="header"><div className="container nav">
       <a className="brand" href="/"><span className="brand-mark">PK</span><span><strong>{content.candidateName.toUpperCase()}</strong><small>{content.campaignTitle.toUpperCase()}</small></span></a>
       <nav className={open ? 'nav-links open' : 'nav-links'}>{links.map(([href,label]) => <a key={href} href={href}>{label}</a>)}<a href="/volunteer" className="nav-cta">Join the Movement</a></nav>
@@ -241,7 +241,7 @@ function Layout({ children, content }: { children: React.ReactNode; content: Con
     <footer><div className="container footer-main">
       <div><div className="brand footer-brand"><span className="brand-mark">PK</span><span><strong>{content.candidateName.toUpperCase()}</strong><small>{content.campaignTitle.toUpperCase()}</small></span></div><p>{content.tagline} for every household.</p></div>
       <div><h4>Quick links</h4><a href="/about">About</a><a href="/agenda">Development agenda</a><a href="/news">News & updates</a><a href="/media">Media centre</a><a href="/volunteer">Volunteer</a></div>
-      <div><h4>Contact</h4><span>{content.office}</span><span>{content.phone}</span><span>{content.email}</span></div>
+      <div><h4>Contact</h4><span>{content.office}</span><a href={`tel:${content.phone.replace(/\s+/g,'')}`}>{content.phone}</a><a href={`mailto:${content.email}`}>{content.email}</a></div>
       <div><h4>Follow</h4><SocialLinks content={content}/></div>
     </div><div className="container footer-bottom"><small>© 2027 Philip Kaloki Campaign.</small><small><a href="/privacy">Privacy</a> • <a href="/terms">Terms</a> • <a href="/accessibility">Accessibility</a></small></div></footer>
   </div>
@@ -421,6 +421,74 @@ function GallerySlideshow({items}:{items:any[]}) {
   </section>
 }
 
+
+function AlbumViewer({
+  items,
+  title,
+  description
+}: {
+  items: any[]
+  title: string
+  description?: string
+}) {
+  const [open,setOpen]=React.useState(false)
+  const [active,setActive]=React.useState(0)
+
+  React.useEffect(()=>{
+    if(!open)return
+    const onKey=(event:KeyboardEvent)=>{
+      if(event.key==='Escape')setOpen(false)
+      if(event.key==='ArrowRight')setActive(v=>(v+1)%items.length)
+      if(event.key==='ArrowLeft')setActive(v=>(v-1+items.length)%items.length)
+    }
+    window.addEventListener('keydown',onKey)
+    return()=>window.removeEventListener('keydown',onKey)
+  },[open,items.length])
+
+  if(!items.length)return null
+  const cover=items[0]
+
+  return <>
+    <button
+      type="button"
+      className="photo-album-card"
+      onClick={()=>{setActive(0);setOpen(true)}}
+      aria-label={`Open ${title} photo album`}
+    >
+      <div className="album-cover-stack">
+        <span className="album-sheet sheet-back"/>
+        <span className="album-sheet sheet-middle"/>
+        <img src={cover.image_url} alt={cover.caption||title}/>
+      </div>
+      <div className="album-card-copy">
+        <span className="section-kicker">PHOTO ALBUM</span>
+        <h3>{title}</h3>
+        {description&&<p>{description}</p>}
+        <strong>{items.length} photograph{items.length===1?'':'s'} · Click to browse</strong>
+      </div>
+    </button>
+
+    {open&&<div className="album-lightbox" role="dialog" aria-modal="true" aria-label={title}>
+      <button type="button" className="album-close" onClick={()=>setOpen(false)} aria-label="Close album"><X/></button>
+      <button type="button" className="album-prev" onClick={()=>setActive(v=>(v-1+items.length)%items.length)} aria-label="Previous photograph">‹</button>
+      <figure>
+        <img src={items[active].image_url} alt={items[active].caption||`Photograph ${active+1}`}/>
+        <figcaption>
+          <strong>{cleanPublicCaption(items[active].caption)}</strong>
+          {items[active].description&&<span>{items[active].description}</span>}
+          <small>{active+1} of {items.length}</small>
+        </figcaption>
+      </figure>
+      <button type="button" className="album-next" onClick={()=>setActive(v=>(v+1)%items.length)} aria-label="Next photograph">›</button>
+      <div className="album-filmstrip">
+        {items.map((item,index)=><button type="button" key={`${item.source}-${item.id}-${index}`} className={index===active?'active':''} onClick={()=>setActive(index)} aria-label={`View photograph ${index+1}`}>
+          <img src={item.image_url} alt=""/>
+        </button>)}
+      </div>
+    </div>}
+  </>
+}
+
 function MediaPage({ content }: { content: Content }) {
   const { data: media, loading } = useLiveApi<LiveMediaAsset[]>('/api/media', [])
   const { data: gallery } = useLiveApi<any[]>('/api/media-gallery', [])
@@ -428,16 +496,54 @@ function MediaPage({ content }: { content: Content }) {
   const resources=media.filter(item=>item.asset_type!=='photo' && usableMediaUrl(item.file_url))
 
   return <main className="inner-page">
-    <section className="page-hero compact"><div className="container"><span className="section-kicker">Media Centre</span><h1>Campaign Media</h1><p>Official photographs, campaign resources and public communications from {content.candidateName}.</p></div></section>
-    <section className="section media-showcase"><div className="container"><div className="section-heading"><span className="section-kicker">FEATURED PHOTOS</span><h2>Campaign moments</h2><p>A rotating selection of recent campaign photographs.</p></div><GallerySlideshow items={photos}/></div></section>
-    <section className="section gallery-section-public"><div className="container"><div className="section-heading"><span className="section-kicker">PHOTO GALLERY</span><h2>Browse all photographs</h2><p>Media Library and event photographs in one compact gallery.</p></div>{photos.length===0?<div className="public-empty"><ImageIcon/><h3>No gallery photographs yet</h3></div>:<div className="public-photo-gallery compact">{photos.map((item:any,index:number)=><a href={item.image_url} target="_blank" rel="noreferrer" key={`${item.source}-${item.id}-${index}`}><img src={item.image_url} alt={item.caption||`Campaign photograph ${index+1}`} loading="lazy"/><span>{cleanPublicCaption(item.caption)}</span></a>)}</div>}</div></section>
-    {resources.length>0&&<section className="section"><div className="container"><div className="section-heading"><span className="section-kicker">RESOURCES</span><h2>Videos & documents</h2></div><div className="media-resource-grid">{resources.map(item=><article key={item.id}><FileText/><div><strong>{item.title||'Campaign resource'}</strong>{item.description&&<p>{item.description}</p>}<a href={item.file_url} target="_blank" rel="noreferrer">Open resource →</a></div></article>)}</div></div></section>}
+    <section className="page-hero compact">
+      <div className="container">
+        <span className="section-kicker">Media Centre</span>
+        <h1>Campaign Media</h1>
+        <p>Official photographs, campaign resources and public communications from {content.candidateName}.</p>
+      </div>
+    </section>
+
+    <section className="section album-section">
+      <div className="container">
+        <div className="section-heading">
+          <span className="section-kicker">PHOTO ALBUMS</span>
+          <h2>Campaign photographs</h2>
+          <p>Open the album and browse the photographs one by one using the arrows, keyboard keys, or thumbnail strip.</p>
+        </div>
+        {loading?<div className="public-empty">Loading campaign album…</div>:
+        photos.length===0?<div className="public-empty"><ImageIcon/><h3>No gallery photographs yet</h3></div>:
+        <div className="album-grid">
+          <AlbumViewer
+            items={photos}
+            title="Campaign moments"
+            description="Media Library and event photographs from campaign activities across Makueni."
+          />
+        </div>}
+      </div>
+    </section>
+
+    {resources.length>0&&<section className="section resources-section">
+      <div className="container">
+        <div className="section-heading"><span className="section-kicker">RESOURCES</span><h2>Videos & documents</h2></div>
+        <div className="media-resource-grid">
+          {resources.map(item=><article key={item.id}>
+            <FileText/>
+            <div>
+              <strong>{item.title||'Campaign resource'}</strong>
+              {item.description&&<p>{item.description}</p>}
+              <a href={item.file_url} target="_blank" rel="noreferrer">Open resource →</a>
+            </div>
+          </article>)}
+        </div>
+      </div>
+    </section>}
   </main>
 }
 function ContactPage({ content }: { content: Content }) {
   const [state,setState] = React.useState('')
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); setState('sending'); const data = Object.fromEntries(new FormData(e.currentTarget)); try { await submit('contact', data); setState('sent'); e.currentTarget.reset() } catch { setState('error') } }
-  return <><PageHero kicker="CONTACT THE CAMPAIGN" title="We are ready to hear from you." text="Send a question, invitation, development proposal or media request to the campaign secretariat."/><section className="section contact-section"><div className="container contact-grid"><div><div className="contact-list"><div><MapPin/><span><strong>Campaign Secretariat</strong><small>{content.office}</small></span></div><div><Phone/><span><strong>Telephone</strong><small>{content.phone}</small></span></div><div><Mail/><span><strong>Email</strong><small>{content.email}</small></span></div></div></div><form className="contact-form" onSubmit={onSubmit}><div className="form-row"><label>Full name<input name="name" required/></label><label>Phone number<input name="phone" required/></label></div><div className="form-row"><label>Email<input name="email" type="email"/></label><label>Subject<select name="subject" required defaultValue=""><option value="" disabled>Select one</option><option>General enquiry</option><option>Media request</option><option>Event invitation</option><option>Development proposal</option><option>Partnership</option></select></label></div><label>Your message<textarea name="message" required rows={6}/></label><input className="hp-field" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true"/><button className="btn primary submit" disabled={state==='sending'}>{state==='sending'?'Sending…':'Send Message'} <ArrowRight size={18}/></button>{state==='sent'&&<div className="success">Thank you. Your message has been saved.</div>}{state==='error'&&<div className="form-error">Could not submit. Start the API with <strong>npm run api</strong>.</div>}</form></div></section></>
+  return <><PageHero kicker="CONTACT THE CAMPAIGN" title="We are ready to hear from you." text="Send a question, invitation, development proposal or media request to the campaign secretariat."/><section className="section contact-section"><div className="container contact-grid"><div><div className="contact-list"><div><MapPin/><span><strong>Campaign Secretariat</strong><small>{content.office}</small></span></div><a href={`tel:${content.phone.replace(/\s+/g,'')}`}><Phone/><span><strong>Telephone</strong><small>{content.phone}</small></span></a><a href={`mailto:${content.email}`}><Mail/><span><strong>Email</strong><small>{content.email}</small></span></a></div></div><form className="contact-form" onSubmit={onSubmit}><div className="form-row"><label>Full name<input name="name" required/></label><label>Phone number<input name="phone" required/></label></div><div className="form-row"><label>Email<input name="email" type="email"/></label><label>Subject<select name="subject" required defaultValue=""><option value="" disabled>Select one</option><option>General enquiry</option><option>Media request</option><option>Event invitation</option><option>Development proposal</option><option>Partnership</option></select></label></div><label>Your message<textarea name="message" required rows={6}/></label><input className="hp-field" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true"/><button className="btn primary submit" disabled={state==='sending'}>{state==='sending'?'Sending…':'Send Message'} <ArrowRight size={18}/></button>{state==='sent'&&<div className="success">Thank you. Your message has been saved.</div>}{state==='error'&&<div className="form-error">Could not submit. Start the API with <strong>npm run api</strong>.</div>}</form></div></section></>
 }
 
 function VolunteerPage() {
@@ -818,7 +924,7 @@ function AdminPage({ content, setContent }: { content: Content; setContent: Reac
 
   const title={dashboard:'Command Dashboard',inbox:'Submission Inbox',content:'Official Website Content',news:'Newsroom Manager',events:'Events Manager',media:'Media Library',images:'Homepage Images',social:'Social Media',audit:'Audit Trail'}[tab]
   const statCards=[['Contacts',stats.contact_submissions||0,<Mail/>],['Volunteers',stats.volunteer_submissions||0,<Users/>],['Citizen ideas',stats.citizen_ideas||0,<MessageCircle/>],['Subscribers',stats.newsletter_subscribers||0,<Inbox/>],['News posts',stats.news_posts||0,<Newspaper/>],['Events',stats.events||0,<Calendar/>],['Media',stats.media_assets||0,<ImageIcon/>]]
-  return <section className="admin-shell cms-v17"><aside className="admin-sidebar"><div className="brand"><span className="brand-mark">PK</span><span><strong>CAMPAIGN CMS</strong><small>SUPABASE • PHASE 25</small></span></div>
+  return <section className="admin-shell cms-v17"><aside className="admin-sidebar"><div className="brand"><span className="brand-mark">PK</span><span><strong>CAMPAIGN CMS</strong><small>SUPABASE • PHASE 26</small></span></div>
     <button className={tab==='dashboard'?'active':''} onClick={()=>changeTab('dashboard')}><LayoutDashboard/> Dashboard</button>
     <button className={tab==='inbox'?'active':''} onClick={()=>changeTab('inbox')}><Inbox/> Submissions</button>
     <button className={tab==='content'?'active':''} onClick={()=>changeTab('content')}><Settings/> Website content</button>
