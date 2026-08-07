@@ -5,7 +5,7 @@ import {
   HeartHandshake, Camera as Instagram, Landmark, Mail, MapPin, Menu, MessageCircle, Megaphone,
   Newspaper, Phone, PlayCircle, ShieldCheck, Sprout, Stethoscope, Target, FileText, Download,
   Users, X, PlayCircle as Youtube, BriefcaseBusiness, GraduationCap, LockKeyhole, LayoutDashboard,
-  Inbox, Save, Home as HomeIcon, LogOut, Settings, Eye, Check, Clock3, ExternalLink, Image as ImageIcon, FileCheck2, BarChart3, Plus, Trash2, RefreshCw, Activity, Calendar, Database, Edit3
+  Inbox, Save, Home as HomeIcon, LogOut, Settings, Eye, Check, Clock3, ExternalLink, Image as ImageIcon, FileCheck2, BarChart3, Plus, Trash2, RefreshCw, Activity, Calendar, Database, Edit3, Music2, Share2, ArrowUp, ArrowDown
 } from 'lucide-react'
 import './styles.css'
 
@@ -21,13 +21,16 @@ type Content = {
   heroText: string
   biography: string
   facebook: string
+  twitter: string
   instagram: string
+  tiktok: string
   youtube: string
   contentStatus: string
   heroImage1: string
   heroImage2: string
   heroImage3: string
   aboutImage: string
+  candidateCardImage: string
 }
 
 type LiveNewsPost = {
@@ -66,6 +69,24 @@ type LiveMediaAsset = {
   created_at?: string
 }
 
+
+type HomeSlide = {
+  id: string
+  image_url: string
+  alt_text?: string
+  sort_order: number
+  is_active: boolean
+}
+
+type EventImage = {
+  id: string
+  event_id: string
+  image_url: string
+  caption?: string
+  sort_order: number
+  created_at?: string
+}
+
 function useLiveApi<T>(url: string, fallback: T) {
   const [data, setData] = React.useState<T>(fallback)
   const [loading, setLoading] = React.useState(true)
@@ -101,11 +122,12 @@ const fallbackContent: Content = {
   email: 'info@philipkaloki.com', whatsapp: '254700000000', office: 'Wote, Makueni County',
   heroText: 'A people-centred movement committed to practical solutions, accountable leadership and opportunity for every family in Makueni County.',
   biography: 'Prof. Philip Kaloki’s leadership journey is founded on public service, professional excellence and a deep commitment to improving lives. His 2027 agenda places communities at the centre of county development.',
-  facebook: '#', instagram: '#', youtube: '#', contentStatus: 'Replace placeholder contact details and campaign wording with formally approved information before public launch.',
+  facebook: '#', twitter: '#', instagram: '#', tiktok: '#', youtube: '#', contentStatus: 'Replace placeholder contact details and campaign wording with formally approved information before public launch.',
   heroImage1: '/assets/philip-kaloki-portrait-hero.webp',
   heroImage2: '/assets/philip-kaloki-field.webp',
   heroImage3: '/assets/philip-kaloki-media-wide.webp',
-  aboutImage: '/assets/philip-kaloki-office.webp'
+  aboutImage: '/assets/philip-kaloki-office.webp',
+  candidateCardImage: '/assets/philip-kaloki-candidate-card.webp'
 }
 
 const priorities = [
@@ -135,14 +157,58 @@ async function submit(type: string, payload: Record<string, unknown>) {
   return res.json()
 }
 
+function validSocial(url?: string) {
+  return Boolean(url && url !== '#' && /^https?:\/\//i.test(url))
+}
+
+function SocialLinks({ content, compact = false }: { content: Content; compact?: boolean }) {
+  const links = [
+    { url: content.facebook, label: 'Facebook', icon: <Facebook/> },
+    { url: content.twitter, label: 'X', icon: <X/> },
+    { url: content.instagram, label: 'Instagram', icon: <Instagram/> },
+    { url: content.tiktok, label: 'TikTok', icon: <Music2/> },
+    { url: content.youtube, label: 'YouTube', icon: <Youtube/> }
+  ].filter(item => validSocial(item.url))
+
+  if (!links.length) return null
+  return <div className={compact ? 'socials top-socials' : 'socials'}>
+    {links.map(item => <a key={item.label} href={item.url} target="_blank" rel="noreferrer" aria-label={item.label}>{item.icon}</a>)}
+  </div>
+}
+
+function setDetailMeta(title: string, description: string, image?: string) {
+  document.title = `${title} | Prof. Philip Kaloki`
+  const set = (property: string, value: string) => {
+    let node = document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement | null
+    if (!node) { node = document.createElement('meta'); node.setAttribute('property', property); document.head.appendChild(node) }
+    node.content = value
+  }
+  set('og:title', title)
+  set('og:description', description)
+  if (image) set('og:image', image)
+}
+
+function CandidateReminder({ content }: { content: Content }) {
+  return <aside className="candidate-reminder">
+    <img src={content.candidateCardImage || fallbackContent.candidateCardImage} alt={content.candidateName}/>
+    <div className="candidate-reminder-copy">
+      <small>VYING FOR</small>
+      <strong>GOVERNOR</strong>
+      <span>Makueni County • 2027</span>
+      <p>{content.strapline}</p>
+      <a href="/agenda">View the development agenda <ArrowRight size={15}/></a>
+    </div>
+  </aside>
+}
+
 function Layout({ children, content }: { children: React.ReactNode; content: Content }) {
   const [open, setOpen] = React.useState(false)
   const [showTop, setShowTop] = React.useState(false)
   React.useEffect(() => { const f = () => setShowTop(window.scrollY > 600); window.addEventListener('scroll', f); return () => window.removeEventListener('scroll', f) }, [])
-  const links = [['/','Home'],['/about','About'],['/agenda','Agenda'],['/news','News'],['/media','Media'],['/contact','Contact']]
+  const links = [['/','Home'],['/about','About'],['/agenda','Agenda'],['/news','News'],['/events','Events'],['/media','Media'],['/contact','Contact']]
   return <div>
     <a className="skip-link" href="#main-content">Skip to main content</a>
-    <div className="topbar"><div className="container topbar-inner"><span>{content.strapline}</span><div><Phone size={15}/> {content.phone} <Mail size={15}/> {content.email}</div></div></div>
+    <div className="topbar"><div className="container topbar-inner"><div className="topbar-message"><span>{content.strapline}</span><SocialLinks content={content} compact/></div><div className="topbar-contact"><Phone size={15}/> {content.phone} <Mail size={15}/> {content.email}</div></div></div>
     <header className="header"><div className="container nav">
       <a className="brand" href="/"><span className="brand-mark">PK</span><span><strong>{content.candidateName.toUpperCase()}</strong><small>{content.campaignTitle.toUpperCase()}</small></span></a>
       <nav className={open ? 'nav-links open' : 'nav-links'}>{links.map(([href,label]) => <a key={href} href={href}>{label}</a>)}<a href="/volunteer" className="nav-cta">Join the Movement</a></nav>
@@ -155,7 +221,7 @@ function Layout({ children, content }: { children: React.ReactNode; content: Con
       <div><div className="brand footer-brand"><span className="brand-mark">PK</span><span><strong>{content.candidateName.toUpperCase()}</strong><small>{content.campaignTitle.toUpperCase()}</small></span></div><p>{content.tagline} for every household.</p></div>
       <div><h4>Quick links</h4><a href="/about">About</a><a href="/agenda">Development agenda</a><a href="/news">News & updates</a><a href="/media">Media centre</a><a href="/volunteer">Volunteer</a></div>
       <div><h4>Contact</h4><span>{content.office}</span><span>{content.phone}</span><span>{content.email}</span></div>
-      <div><h4>Follow</h4><div className="socials"><a href={content.facebook}><Facebook/></a><a href={content.instagram}><Instagram/></a><a href={content.youtube}><Youtube/></a></div></div>
+      <div><h4>Follow</h4><SocialLinks content={content}/></div>
     </div><div className="container footer-bottom"><small>© 2027 Philip Kaloki Campaign.</small><small><a href="/privacy">Privacy</a> • <a href="/terms">Terms</a> • <a href="/accessibility">Accessibility</a> • <a href="/admin">Admin</a></small></div></footer>
   </div>
 }
@@ -166,81 +232,43 @@ function PageHero({ kicker, title, text, image }: { kicker: string; title: strin
 
 
 function HeroSlideshow({ content }: { content: Content }) {
-  const slides = [
-    { src: content.heroImage1 || fallbackContent.heroImage1, label: 'Leadership for Makueni' },
-    { src: content.heroImage2 || fallbackContent.heroImage2, label: 'Listening across the county' },
-    { src: content.heroImage3 || fallbackContent.heroImage3, label: 'A people-centred campaign' }
-  ].filter(slide => Boolean(slide.src))
+  const fallbackSlides: HomeSlide[] = [
+    { id: 'fallback-1', image_url: content.heroImage1 || fallbackContent.heroImage1, alt_text: 'Leadership for Makueni', sort_order: 0, is_active: true },
+    { id: 'fallback-2', image_url: content.heroImage2 || fallbackContent.heroImage2, alt_text: 'Listening across the county', sort_order: 1, is_active: true },
+    { id: 'fallback-3', image_url: content.heroImage3 || fallbackContent.heroImage3, alt_text: 'A people-centred campaign', sort_order: 2, is_active: true }
+  ].filter(slide => Boolean(slide.image_url))
 
+  const [remoteSlides, setRemoteSlides] = React.useState<HomeSlide[]>([])
   const [active, setActive] = React.useState(0)
+  const [paused, setPaused] = React.useState(false)
 
   React.useEffect(() => {
-    if (slides.length <= 1) return
-    const timer = window.setInterval(
-      () => setActive(current => (current + 1) % slides.length),
-      5000
-    )
+    fetch('/api/homepage-slides')
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setRemoteSlides(Array.isArray(data) ? data : []))
+      .catch(() => setRemoteSlides([]))
+  }, [])
+
+  const slides = remoteSlides.length ? remoteSlides : fallbackSlides
+
+  React.useEffect(() => {
+    if (paused || slides.length <= 1) return
+    const timer = window.setInterval(() => setActive(current => (current + 1) % slides.length), 5000)
     return () => window.clearInterval(timer)
-  }, [slides.length])
+  }, [paused, slides.length])
 
-  React.useEffect(() => {
-    if (active >= slides.length) setActive(0)
-  }, [active, slides.length])
-
+  React.useEffect(() => { if (active >= slides.length) setActive(0) }, [active, slides.length])
   if (!slides.length) return null
 
-  return (
-    <div className="hero-slideshow" aria-label="Campaign image slideshow">
-      <div className="hero-slide-stage">
-        {slides.map((slide, index) => (
-          <figure
-            key={`${slide.src}-${index}`}
-            className={index === active ? 'hero-slide active' : 'hero-slide'}
-          >
-            <img src={slide.src} alt={slide.label} />
-            <figcaption>
-              <strong>{content.candidateName}</strong>
-              <span>{slide.label}</span>
-            </figcaption>
-          </figure>
-        ))}
-      </div>
-
-      {slides.length > 1 && (
-        <>
-          <button
-            className="slide-control previous"
-            aria-label="Previous campaign image"
-            onClick={() =>
-              setActive(current => (current - 1 + slides.length) % slides.length)
-            }
-          >
-            ‹
-          </button>
-          <button
-            className="slide-control next"
-            aria-label="Next campaign image"
-            onClick={() =>
-              setActive(current => (current + 1) % slides.length)
-            }
-          >
-            ›
-          </button>
-
-          <div className="slide-dots" aria-label="Choose campaign image">
-            {slides.map((_, index) => (
-              <button
-                key={index}
-                className={index === active ? 'active' : ''}
-                aria-label={`Show image ${index + 1}`}
-                onClick={() => setActive(index)}
-              />
-            ))}
-          </div>
-        </>
-      )}
+  return <div className="hero-slideshow" aria-label="Campaign image slideshow" onMouseEnter={()=>setPaused(true)} onMouseLeave={()=>setPaused(false)} onFocus={()=>setPaused(true)} onBlur={()=>setPaused(false)}>
+    <div className="hero-slide-stage">
+      {slides.map((slide,index)=><figure key={slide.id} className={index===active?'hero-slide active':'hero-slide'}>
+        <img src={slide.image_url} alt={slide.alt_text || `Campaign photograph ${index+1}`}/>
+        <figcaption><strong>{content.candidateName}</strong><span>{slide.alt_text || content.strapline}</span></figcaption>
+      </figure>)}
     </div>
-  )
+    {slides.length>1&&<><button className="slide-control previous" aria-label="Previous campaign image" onClick={()=>setActive(current=>(current-1+slides.length)%slides.length)}>‹</button><button className="slide-control next" aria-label="Next campaign image" onClick={()=>setActive(current=>(current+1)%slides.length)}>›</button><div className="slide-dots">{slides.map((slide,index)=><button key={slide.id} className={index===active?'active':''} aria-label={`Show image ${index+1}`} onClick={()=>setActive(index)}/>)}</div></>}
+  </div>
 }
 
 function HomePage({ content }: { content: Content }) {
@@ -299,75 +327,24 @@ function NewsPage(){
 
 
 
-function NewsDetailPage({ slug }: { slug: string }) {
-  const [post, setPost] = React.useState<LiveNewsPost | null>(null)
-  const [loading, setLoading] = React.useState(true)
-
-  React.useEffect(() => {
-    fetch(`/api/news/${encodeURIComponent(slug)}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(setPost)
-      .catch(() => setPost(null))
-      .finally(() => setLoading(false))
-  }, [slug])
-
-  if (loading) return <main className="inner-page"><section className="section"><div className="container"><div className="public-empty">Loading article…</div></div></section></main>
-  if (!post) return <NotFoundPage/>
-
-  return <main className="inner-page">
-    <section className="article-hero">
-      <div className="container article-wrap">
-        <span className="section-kicker">{post.category || 'Campaign Update'}</span>
-        <h1>{post.title}</h1>
-        {post.published_at && <p className="article-meta">{new Date(post.published_at).toLocaleString()}</p>}
-      </div>
-    </section>
-    <article className="section">
-      <div className="container article-wrap">
-        {post.image_url && <img className="article-cover" src={post.image_url} alt="" />}
-        {post.summary && <p className="article-summary">{post.summary}</p>}
-        <div className="article-body">{(post.body || '').split('\n').map((p,i)=><p key={i}>{p}</p>)}</div>
-        <a className="detail-link" href="/news">← Back to news</a>
-      </div>
-    </article>
-  </main>
+function NewsDetailPage({ slug, content }: { slug: string; content: Content }) {
+  const [post,setPost]=React.useState<LiveNewsPost|null>(null)
+  const [loading,setLoading]=React.useState(true)
+  React.useEffect(()=>{fetch(`/api/news/${encodeURIComponent(slug)}`).then(r=>r.ok?r.json():null).then(data=>{setPost(data);if(data)setDetailMeta(data.title,data.summary||data.body||content.strapline,data.image_url)}).catch(()=>setPost(null)).finally(()=>setLoading(false))},[slug,content.strapline])
+  if(loading)return <main className="inner-page"><section className="section"><div className="container"><div className="public-empty">Loading article…</div></div></section></main>
+  if(!post)return <NotFoundPage/>
+  return <main className="inner-page"><section className="article-hero"><div className="container article-title-wrap"><div><span className="section-kicker">{post.category||'Campaign Update'}</span><h1>{post.title}</h1>{post.published_at&&<p className="article-meta">{new Date(post.published_at).toLocaleString()}</p>}</div><CandidateReminder content={content}/></div></section><article className="section"><div className="container detail-layout"><div className="article-wrap">{post.image_url&&<img className="article-cover" src={post.image_url} alt={post.title}/>} {post.summary&&<p className="article-summary">{post.summary}</p>}<div className="article-body">{(post.body||'').split('\n').map((p,i)=><p key={i}>{p}</p>)}</div><div className="detail-share"><Share2/><span>Share this update through the campaign social channels.</span><SocialLinks content={content}/></div><a className="detail-link" href="/news">← Back to news</a></div><div className="detail-aside"><CandidateReminder content={content}/></div></div></article></main>
 }
 
-function EventDetailPage({ id }: { id: string }) {
-  const [event, setEvent] = React.useState<LiveEvent | null>(null)
-  const [loading, setLoading] = React.useState(true)
-
-  React.useEffect(() => {
-    fetch(`/api/events/${encodeURIComponent(id)}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(setEvent)
-      .catch(() => setEvent(null))
-      .finally(() => setLoading(false))
-  }, [id])
-
-  if (loading) return <main className="inner-page"><section className="section"><div className="container"><div className="public-empty">Loading event…</div></div></section></main>
-  if (!event) return <NotFoundPage/>
-
-  return <main className="inner-page">
-    <section className="article-hero">
-      <div className="container article-wrap">
-        <span className="section-kicker">Campaign Event</span>
-        <h1>{event.title}</h1>
-        {event.event_date && <p className="article-meta">{new Date(event.event_date).toLocaleString()}</p>}
-      </div>
-    </section>
-    <section className="section">
-      <div className="container article-wrap">
-        {event.image_url && <img className="article-cover" src={event.image_url} alt="" />}
-        <div className="event-detail-card">
-          <strong>Location</strong>
-          <p>{[event.venue,event.ward].filter(Boolean).join(' • ') || 'Venue to be announced'}</p>
-        </div>
-        <div className="article-body"><p>{event.description || ''}</p></div>
-        <a className="detail-link" href="/events">← Back to events</a>
-      </div>
-    </section>
-  </main>
+function EventDetailPage({ id, content }: { id: string; content: Content }) {
+  const [event,setEvent]=React.useState<LiveEvent|null>(null)
+  const [images,setImages]=React.useState<EventImage[]>([])
+  const [selected,setSelected]=React.useState<EventImage|null>(null)
+  const [loading,setLoading]=React.useState(true)
+  React.useEffect(()=>{Promise.all([fetch(`/api/events/${encodeURIComponent(id)}`).then(r=>r.ok?r.json():null),fetch(`/api/events/${encodeURIComponent(id)}/images`).then(r=>r.ok?r.json():[])]).then(([eventData,imageData])=>{setEvent(eventData);setImages(Array.isArray(imageData)?imageData:[]);if(eventData)setDetailMeta(eventData.title,eventData.description||content.strapline,eventData.image_url)}).catch(()=>setEvent(null)).finally(()=>setLoading(false))},[id,content.strapline])
+  if(loading)return <main className="inner-page"><section className="section"><div className="container"><div className="public-empty">Loading event…</div></div></section></main>
+  if(!event)return <NotFoundPage/>
+  return <main className="inner-page"><section className="article-hero"><div className="container article-title-wrap"><div><span className="section-kicker">Campaign Event</span><h1>{event.title}</h1>{event.event_date&&<p className="article-meta">{new Date(event.event_date).toLocaleString()}</p>}</div><CandidateReminder content={content}/></div></section><section className="section"><div className="container detail-layout"><div className="article-wrap">{event.image_url&&<img className="article-cover" src={event.image_url} alt={event.title}/>}<div className="event-detail-card"><strong>Location</strong><p>{[event.venue,event.ward].filter(Boolean).join(' • ')||'Venue to be announced'}</p></div><div className="article-body"><p>{event.description||''}</p></div>{images.length>0&&<section className="event-public-gallery"><div className="section-kicker">EVENT PHOTO GALLERY</div><h2>Moments from this event</h2><div className="event-mini-gallery">{images.map((img,index)=><button key={img.id} onClick={()=>setSelected(img)}><img src={img.image_url} alt={img.caption||`Event photograph ${index+1}`} loading="lazy"/><span>{img.caption||`Photo ${index+1}`}</span></button>)}</div></section>}<a className="detail-link" href="/events">← Back to events</a></div><div className="detail-aside"><CandidateReminder content={content}/></div></div></section>{selected&&<div className="gallery-lightbox" role="dialog" aria-modal="true" onClick={()=>setSelected(null)}><button aria-label="Close gallery" onClick={()=>setSelected(null)}><X/></button><img src={selected.image_url} alt={selected.caption||'Event photograph'}/>{selected.caption&&<p>{selected.caption}</p>}</div>}</main>
 }
 
 function EventsPage(){
@@ -508,7 +485,7 @@ function updateSeo(path: string, content: Content) {
   if(canonical) canonical.href=window.location.origin+path
 }
 
-type AdminTab = 'dashboard'|'inbox'|'content'|'news'|'events'|'media'|'images'|'audit'
+type AdminTab = 'dashboard'|'inbox'|'content'|'news'|'events'|'media'|'images'|'social'|'audit'
 type CmsRow = Record<string, any> & { id: string }
 
 
@@ -594,92 +571,25 @@ function AdminUploadField({
   )
 }
 
-function SiteImagesManager({
-  content,
-  setContent,
-  adminKey
-}: {
-  content: Content
-  setContent: React.Dispatch<React.SetStateAction<Content>>
-  adminKey: string
-}) {
-  const [busy, setBusy] = React.useState(false)
-  const [message, setMessage] = React.useState('')
+function SiteImagesManager({ content, setContent, adminKey }: { content: Content; setContent: React.Dispatch<React.SetStateAction<Content>>; adminKey: string }) {
+  const [slides,setSlides]=React.useState<HomeSlide[]>([])
+  const [message,setMessage]=React.useState('')
+  const [busy,setBusy]=React.useState(false)
+  const headers={'x-admin-key':adminKey,'Content-Type':'application/json'}
+  const load=async()=>{const r=await fetch('/api/admin/slides',{headers:{'x-admin-key':adminKey}});if(r.ok)setSlides(await r.json())}
+  React.useEffect(()=>{load()},[])
+  const add=async(e:React.FormEvent<HTMLFormElement>)=>{e.preventDefault();setBusy(true);const data=Object.fromEntries(new FormData(e.currentTarget));const r=await fetch('/api/admin/slides',{method:'POST',headers,body:JSON.stringify({...data,is_active:true,sort_order:slides.length})});if(r.ok){e.currentTarget.reset();await load();setMessage('Slideshow image added.')}else setMessage('Could not add slideshow image.');setBusy(false)}
+  const remove=async(id:string)=>{if(!confirm('Remove this slideshow image?'))return;await fetch(`/api/admin/slides/${id}`,{method:'DELETE',headers:{'x-admin-key':adminKey}});await load()}
+  const toggle=async(slide:HomeSlide)=>{await fetch(`/api/admin/slides/${slide.id}`,{method:'PUT',headers,body:JSON.stringify({...slide,is_active:!slide.is_active})});await load()}
+  const move=async(index:number,direction:-1|1)=>{const target=index+direction;if(target<0||target>=slides.length)return;const ordered=[...slides];[ordered[index],ordered[target]]=[ordered[target],ordered[index]];const r=await fetch('/api/admin/slides/reorder',{method:'POST',headers,body:JSON.stringify({ids:ordered.map(s=>s.id)})});if(r.ok)await load()}
+  const saveCovers=async(e:React.FormEvent<HTMLFormElement>)=>{e.preventDefault();setBusy(true);const data=Object.fromEntries(new FormData(e.currentTarget));const r=await fetch('/api/admin/content',{method:'PUT',headers,body:JSON.stringify(data)});if(r.ok){const next=await r.json();setContent(prev=>({...fallbackContent,...prev,...next}));setMessage('Cover and candidate images updated.')}else setMessage('Could not save cover images.');setBusy(false)}
+  return <div className="phase21-image-manager"><form className="site-images-manager" onSubmit={add}><div className="cms-create-title"><ImageIcon/><div><h2>Automatic homepage slideshow</h2><p>Add as many images as you want. Active images rotate every five seconds in the order shown below.</p></div></div><AdminUploadField name="image_url" label="New slideshow image" adminKey={adminKey} required/><label>Caption / alt text<input name="alt_text" placeholder="e.g. Meeting farmers in Makueni"/></label><button className="btn primary" disabled={busy}><Plus/> Add Image</button></form><div className="slides-admin-list"><div className="cms-records-head"><h2>Slideshow images</h2><span>{slides.length} images</span></div>{slides.length===0?<div className="empty-state"><ImageIcon/><h3>No database slides yet</h3><p>The homepage will keep using the Phase 20 fallback images until you add the first slide.</p></div>:slides.map((slide,index)=><article key={slide.id}><img src={slide.image_url} alt=""/><div><strong>{slide.alt_text||`Slideshow image ${index+1}`}</strong><span>{slide.is_active?'Active':'Hidden'}</span></div><div className="slide-admin-actions"><button onClick={()=>move(index,-1)} disabled={index===0} aria-label="Move up"><ArrowUp/></button><button onClick={()=>move(index,1)} disabled={index===slides.length-1} aria-label="Move down"><ArrowDown/></button><button onClick={()=>toggle(slide)}>{slide.is_active?'Hide':'Show'}</button><button className="danger-icon" onClick={()=>remove(slide.id)}><Trash2/></button></div></article>)}</div><form className="site-images-manager cover-manager" onSubmit={saveCovers}><div className="cms-create-title"><ImageIcon/><div><h2>Cover & candidate identity images</h2><p>Change the About page cover and the portrait shown on News/Event pages.</p></div></div><div className="site-image-grid"><AdminUploadField name="aboutImage" label="About / cover image" defaultValue={content.aboutImage} adminKey={adminKey}/><AdminUploadField name="candidateCardImage" label="News & event candidate portrait" defaultValue={content.candidateCardImage} adminKey={adminKey}/></div><button className="btn primary" disabled={busy}><Save/> Save Image Changes</button></form>{message&&<div className="admin-message">{message}</div>}</div>
+}
 
-  const save = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    setBusy(true)
-    setMessage('')
-
-    const data = Object.fromEntries(new FormData(event.currentTarget))
-
-    const response = await fetch('/api/admin/content', {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-admin-key': adminKey
-      },
-      body: JSON.stringify(data)
-    })
-
-    if (response.ok) {
-      const next = await response.json()
-      setContent(previous => ({ ...fallbackContent, ...previous, ...next }))
-      setMessage('Homepage images updated. Refresh the public website to view them.')
-    } else {
-      setMessage('Unable to save image settings.')
-    }
-
-    setBusy(false)
-  }
-
-  return (
-    <form className="site-images-manager" onSubmit={save}>
-      <div className="cms-create-title">
-        <ImageIcon/>
-        <div>
-          <h2>Homepage & cover images</h2>
-          <p>
-            Upload new campaign photographs directly to Supabase.
-            The homepage slideshow rotates automatically every five seconds.
-          </p>
-        </div>
-      </div>
-
-      <div className="site-image-grid">
-        <AdminUploadField
-          name="heroImage1"
-          label="Slideshow image 1"
-          defaultValue={content.heroImage1}
-          adminKey={adminKey}
-        />
-        <AdminUploadField
-          name="heroImage2"
-          label="Slideshow image 2"
-          defaultValue={content.heroImage2}
-          adminKey={adminKey}
-        />
-        <AdminUploadField
-          name="heroImage3"
-          label="Slideshow image 3"
-          defaultValue={content.heroImage3}
-          adminKey={adminKey}
-        />
-        <AdminUploadField
-          name="aboutImage"
-          label="About / cover image"
-          defaultValue={content.aboutImage}
-          adminKey={adminKey}
-        />
-      </div>
-
-      {message && <div className="admin-message">{message}</div>}
-
-      <button className="btn primary" disabled={busy}>
-        <Save/> {busy ? 'Saving…' : 'Save Image Changes'}
-      </button>
-    </form>
-  )
+function SocialMediaManager({ content, setContent, adminKey }: { content: Content; setContent: React.Dispatch<React.SetStateAction<Content>>; adminKey: string }) {
+  const [message,setMessage]=React.useState('')
+  const save=async(e:React.FormEvent<HTMLFormElement>)=>{e.preventDefault();const data=Object.fromEntries(new FormData(e.currentTarget));const r=await fetch('/api/admin/content',{method:'PUT',headers:{'Content-Type':'application/json','x-admin-key':adminKey},body:JSON.stringify(data)});if(r.ok){const next=await r.json();setContent(prev=>({...fallbackContent,...prev,...next}));setMessage('Social media handles updated.')}else setMessage('Could not save social handles.')}
+  return <form className="social-admin-manager" onSubmit={save}><div className="cms-create-title"><Share2/><div><h2>Social media handles</h2><p>These links appear beside the leadership message and in the website footer.</p></div></div><div className="social-admin-grid"><label><Facebook/> Facebook<input name="facebook" defaultValue={content.facebook||''} placeholder="https://facebook.com/..."/></label><label><X/> X (Twitter)<input name="twitter" defaultValue={content.twitter||''} placeholder="https://x.com/..."/></label><label><Instagram/> Instagram<input name="instagram" defaultValue={content.instagram||''} placeholder="https://instagram.com/..."/></label><label><Music2/> TikTok<input name="tiktok" defaultValue={content.tiktok||''} placeholder="https://tiktok.com/@..."/></label><label><Youtube/> YouTube<input name="youtube" defaultValue={content.youtube||''} placeholder="https://youtube.com/@..."/></label></div><button className="btn primary"><Save/> Save Social Handles</button>{message&&<div className="admin-message">{message}</div>}</form>
 }
 
 function AdminPage({ content, setContent }: { content: Content; setContent: React.Dispatch<React.SetStateAction<Content>> }) {
@@ -706,9 +616,9 @@ function AdminPage({ content, setContent }: { content: Content; setContent: Reac
 
   if(!logged) return <section className="admin-shell"><div className="admin-login"><LockKeyhole/><h1>Campaign Admin</h1><p>Secure content management for the Philip Kaloki campaign website.</p><form onSubmit={login}><input type="password" value={key} onChange={e=>setKey(e.target.value)} placeholder="Admin key"/><button className="btn primary">Sign in</button></form>{message&&<div className="form-error">{message}</div>}<a href="/">← Back to website</a></div></section>
 
-  const title={dashboard:'Command Dashboard',inbox:'Submission Inbox',content:'Official Website Content',news:'Newsroom Manager',events:'Events Manager',media:'Media Library',images:'Homepage Images',audit:'Audit Trail'}[tab]
+  const title={dashboard:'Command Dashboard',inbox:'Submission Inbox',content:'Official Website Content',news:'Newsroom Manager',events:'Events Manager',media:'Media Library',images:'Homepage Images',social:'Social Media',audit:'Audit Trail'}[tab]
   const statCards=[['Contacts',stats.contact_submissions||0,<Mail/>],['Volunteers',stats.volunteer_submissions||0,<Users/>],['Citizen ideas',stats.citizen_ideas||0,<MessageCircle/>],['Subscribers',stats.newsletter_subscribers||0,<Inbox/>],['News posts',stats.news_posts||0,<Newspaper/>],['Events',stats.events||0,<Calendar/>],['Media',stats.media_assets||0,<ImageIcon/>]]
-  return <section className="admin-shell cms-v17"><aside className="admin-sidebar"><div className="brand"><span className="brand-mark">PK</span><span><strong>CAMPAIGN CMS</strong><small>SUPABASE • PHASE 20</small></span></div>
+  return <section className="admin-shell cms-v17"><aside className="admin-sidebar"><div className="brand"><span className="brand-mark">PK</span><span><strong>CAMPAIGN CMS</strong><small>SUPABASE • PHASE 21</small></span></div>
     <button className={tab==='dashboard'?'active':''} onClick={()=>changeTab('dashboard')}><LayoutDashboard/> Dashboard</button>
     <button className={tab==='inbox'?'active':''} onClick={()=>changeTab('inbox')}><Inbox/> Submissions</button>
     <button className={tab==='content'?'active':''} onClick={()=>changeTab('content')}><Settings/> Website content</button>
@@ -716,6 +626,7 @@ function AdminPage({ content, setContent }: { content: Content; setContent: Reac
     <button className={tab==='events'?'active':''} onClick={()=>changeTab('events')}><Calendar/> Events</button>
     <button className={tab==='media'?'active':''} onClick={()=>changeTab('media')}><ImageIcon/> Media</button>
     <button className={tab==='images'?'active':''} onClick={()=>changeTab('images')}><ImageIcon/> Homepage images</button>
+    <button className={tab==='social'?'active':''} onClick={()=>changeTab('social')}><Share2/> Social media</button>
     <button className={tab==='audit'?'active':''} onClick={()=>changeTab('audit')}><Activity/> Audit log</button>
     <a href="/"><Eye/> View website</a><button onClick={()=>{sessionStorage.removeItem('pk-admin-key');location.reload()}}><LogOut/> Sign out</button></aside>
     <div className="admin-main"><div className="admin-top"><div><span>CAMPAIGN SECRETARIAT</span><h1>{title}</h1></div><button className="admin-refresh" onClick={()=>changeTab(tab)}><RefreshCw/> Refresh</button></div>{message&&<div className="admin-message">{message}</div>}
@@ -726,8 +637,21 @@ function AdminPage({ content, setContent }: { content: Content; setContent: Reac
     {tab==='events'&&<CmsManager kind="events" rows={cmsRows} busy={busy} onSave={saveCms} onDelete={deleteCms} adminKey={key}/>}
     {tab==='media'&&<CmsManager kind="media" rows={cmsRows} busy={busy} onSave={saveCms} onDelete={deleteCms} adminKey={key}/>}
     {tab==='images'&&<SiteImagesManager content={content} setContent={setContent} adminKey={key}/>}
+    {tab==='social'&&<SocialMediaManager content={content} setContent={setContent} adminKey={key}/>}
     {tab==='audit'&&<div className="audit-list">{cmsRows.map(r=><article key={r.id}><Activity/><div><strong>{String(r.action||'Activity')}</strong><span>{String(r.entity_type||'system')} {r.entity_id?`• ${r.entity_id}`:''}</span><small>{r.created_at?new Date(r.created_at).toLocaleString():''}</small></div></article>)}</div>}
     </div></section>
+}
+
+function EventGalleryAdmin({ eventId, adminKey }: { eventId: string; adminKey: string }) {
+  const [images,setImages]=React.useState<EventImage[]>([])
+  const [busy,setBusy]=React.useState(false)
+  const [message,setMessage]=React.useState('')
+  const load=async()=>{const r=await fetch(`/api/admin/events/${eventId}/images`,{headers:{'x-admin-key':adminKey}});if(r.ok)setImages(await r.json())}
+  React.useEffect(()=>{load()},[eventId])
+  const upload=async(e:React.ChangeEvent<HTMLInputElement>)=>{const files=Array.from(e.target.files||[]);if(!files.length)return;setBusy(true);const body=new FormData();files.forEach(file=>body.append('files',file));const r=await fetch(`/api/admin/events/${eventId}/images`,{method:'POST',headers:{'x-admin-key':adminKey},body});if(r.ok){await load();setMessage(`${files.length} event photo${files.length===1?'':'s'} uploaded.`)}else setMessage('Event gallery upload failed.');setBusy(false);e.target.value=''}
+  const remove=async(id:string)=>{await fetch(`/api/admin/event-images/${id}`,{method:'DELETE',headers:{'x-admin-key':adminKey}});await load()}
+  const reorder=async(index:number,direction:-1|1)=>{const target=index+direction;if(target<0||target>=images.length)return;const ordered=[...images];[ordered[index],ordered[target]]=[ordered[target],ordered[index]];const r=await fetch(`/api/admin/events/${eventId}/images/reorder`,{method:'POST',headers:{'Content-Type':'application/json','x-admin-key':adminKey},body:JSON.stringify({ids:ordered.map(i=>i.id)})});if(r.ok)await load()}
+  return <section className="event-gallery-admin"><div className="cms-create-title"><ImageIcon/><div><h3>Event mini gallery</h3><p>Upload unlimited event photographs in batches. Visitors see them on this event's public page.</p></div></div><div className="event-gallery-upload"><input type="file" accept="image/*" multiple onChange={upload} disabled={busy}/><span>{busy?'Uploading…':'Select multiple photographs'}</span></div>{message&&<small>{message}</small>}<div className="event-gallery-admin-grid">{images.map((img,index)=><article key={img.id}><img src={img.image_url} alt=""/><div><button type="button" onClick={()=>reorder(index,-1)} disabled={index===0}><ArrowUp/></button><button type="button" onClick={()=>reorder(index,1)} disabled={index===images.length-1}><ArrowDown/></button><button type="button" className="danger-icon" onClick={()=>remove(img.id)}><Trash2/></button></div></article>)}</div></section>
 }
 
 function CmsManager({
@@ -923,6 +847,8 @@ function CmsManager({
           </>
         )}
 
+        {kind === 'events' && editing?.id && <EventGalleryAdmin eventId={editing.id} adminKey={adminKey}/>}
+
         <div className="cms-form-actions">
           <button className="btn primary" disabled={busy}>
             <Save/> {busy ? 'Saving…' : editing ? 'Save Changes' : 'Publish'}
@@ -993,8 +919,8 @@ function PublicApp() {
   const path=window.location.pathname.replace(/\/+$/,'')||'/'
   React.useEffect(()=>updateSeo(path,content),[path,content])
   if(path==='/admin') return <AdminPage content={content} setContent={setContent}/>
-  if(path.startsWith('/news/')) return <Layout content={content}><NewsDetailPage slug={decodeURIComponent(path.slice('/news/'.length))}/></Layout>
-  if(path.startsWith('/events/')) return <Layout content={content}><EventDetailPage id={decodeURIComponent(path.slice('/events/'.length))}/></Layout>
+  if(path.startsWith('/news/')) return <Layout content={content}><NewsDetailPage slug={decodeURIComponent(path.slice('/news/'.length))} content={content}/></Layout>
+  if(path.startsWith('/events/')) return <Layout content={content}><EventDetailPage id={decodeURIComponent(path.slice('/events/'.length))} content={content}/></Layout>
   let page:React.ReactNode
   if(path==='/') page=<HomePage content={content}/>
   else if(path==='/about') page=<AboutPage content={content}/>
