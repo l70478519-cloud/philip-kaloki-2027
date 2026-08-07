@@ -62,10 +62,110 @@ async function audit(action,entity_type,entity_id=null,details={}){const{error}=
 async function contentObject(){const{data,error}=await supabase.from('campaign_content').select('content_key,content_value');if(error)throw error;return Object.fromEntries((data||[]).map(r=>[r.content_key,r.content_value??'']))}
 function normalize(type,row){return{id:row.id,type,createdAt:row.created_at,status:row.status||'new',name:row.full_name||'',email:row.email||'',phone:row.phone||'',ward:row.ward||'',subCounty:row.sub_county||'',subject:row.subject||'',message:row.message||row.idea||'',interest:row.interest||'',category:row.category||''}}
 
-app.get('/api/health',async(_req,res)=>{const{error}=await supabase.from('campaign_content').select('id').limit(1);res.status(error?503:200).json({status:error?'error':'ok',service:'philip-kaloki-website-api',storage:'supabase-postgresql',phase:'phase-21'})})
+app.get('/api/health',async(_req,res)=>{const{error}=await supabase.from('campaign_content').select('id').limit(1);res.status(error?503:200).json({status:error?'error':'ok',service:'philip-kaloki-website-api',storage:'supabase-postgresql',phase:'phase-29'})})
 app.get('/api/content',async(_req,res)=>{try{res.setHeader('Cache-Control','public,max-age=60');res.json(await contentObject())}catch(e){console.error(e);res.status(500).json({error:'Unable to load content'})}})
 
-app.post('/api/submissions/:type',rateLimit(60_000,8),async(req,res)=>{try{const type=req.params.type;if(!['contact','volunteer','idea','newsletter'].includes(type))return res.status(400).json({error:'Unsupported type'});if(bot(req.body))return res.status(201).json({ok:true});const p=clean(req.body);let table,record;if(type==='contact'){table='contact_submissions';record={full_name:p.fullName||p.name||'',email:p.email||'',phone:p.phone||'',subject:p.subject||'',message:p.message||'',ward:p.ward||''}}if(type==='volunteer'){table='volunteer_submissions';record={full_name:p.fullName||p.name||'',email:p.email||'',phone:p.phone||'',ward:p.ward||'',sub_county:p.subCounty||p.sub_county||'',interest:p.interest||'',message:p.message||''}}if(type==='idea'){table='citizen_ideas';record={full_name:p.fullName||p.name||'',email:p.email||'',phone:p.phone||'',ward:p.ward||'',category:p.category||'',idea:p.idea||p.message||''}}if(type==='newsletter'){table='newsletter_subscribers';record={email:p.email||'',full_name:p.fullName||p.name||''}}const{data,error}=await supabase.from(table).insert(record).select().single();if(error){if(type==='newsletter'&&error.code==='23505')return res.json({ok:true,alreadySubscribed:true});throw error}await audit('submission_created',table,data.id,{type});res.status(201).json({ok:true,id:data.id})}catch(e){console.error(e);res.status(500).json({error:'Unable to save submission'})}})
+app.post('/api/submissions/:type',rateLimit(60_000,20),async(req,res)=>{
+  try{
+    const type=String(req.params.type||'')
+    if(!['contact','volunteer','idea','newsletter'].includes(type)){
+      return res.status(400).json({error:'Unsupported submission type.'})
+    }
+
+    if(bot(req.body))return res.status(201).json({ok:true})
+
+    const p=clean(req.body)
+    let table=''
+    let record={}
+
+    if(type==='volunteer'){
+      const name=p.fullName||p.name||''
+      if(!name||!p.phone||!p.ward||!p.interest){
+        return res.status(400).json({error:'Please complete your name, phone, ward and area of interest.'})
+      }
+      if(String(p.consent||'').toLowerCase()!=='yes'){
+        return res.status(400).json({error:'Please confirm consent before submitting.'})
+      }
+
+      table='volunteer_submissions'
+      record={
+        full_name:name,
+        email:p.email||'',
+        phone:p.phone||'',
+        ward:p.ward||'',
+        sub_county:p.subCounty||p.sub_county||'',
+        interest:p.interest||'',
+        message:p.message||''
+      }
+    }
+
+    if(type==='contact'){
+      const name=p.fullName||p.name||''
+      if(!name||!p.phone||!p.message){
+        return res.status(400).json({error:'Please complete your name, phone number and message.'})
+      }
+
+      table='contact_submissions'
+      record={
+        full_name:name,
+        email:p.email||'',
+        phone:p.phone||'',
+        subject:p.subject||'General enquiry',
+        message:p.message||'',
+        ward:p.ward||''
+      }
+    }
+
+    if(type==='idea'){
+      const idea=p.idea||p.message||''
+      if(!idea){
+        return res.status(400).json({error:'Please enter your idea or suggestion.'})
+      }
+
+      table='citizen_ideas'
+      record={
+        full_name:p.fullName||p.name||'',
+        email:p.email||'',
+        phone:p.phone||'',
+        ward:p.ward||'',
+        category:p.category||'General',
+        idea
+      }
+    }
+
+    if(type==='newsletter'){
+      if(!p.email){
+        return res.status(400).json({error:'Please enter an email address.'})
+      }
+
+      table='newsletter_subscribers'
+      record={
+        email:p.email||'',
+        full_name:p.fullName||p.name||''
+      }
+    }
+
+    const{data,error}=await supabase.from(table).insert(record).select('id').single()
+
+    if(error){
+      if(type==='newsletter'&&error.code==='23505'){
+        return res.status(200).json({ok:true,alreadySubscribed:true})
+      }
+      console.error(`submission:${type}`,error)
+      return res.status(500).json({
+        error:'We could not save your information right now. Please try again shortly.'
+      })
+    }
+
+    await audit('submission_created',table,data.id,{type})
+    return res.status(201).json({ok:true,id:data.id,type})
+  }catch(error){
+    console.error('public submission:',error)
+    return res.status(500).json({
+      error:'We could not save your information right now. Please try again shortly.'
+    })
+  }
+})
 
 
 app.post('/api/admin/media/bulk-delete',adminOnly,async(req,res)=>{

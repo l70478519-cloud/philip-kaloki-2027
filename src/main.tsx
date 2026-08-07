@@ -36,10 +36,14 @@ type Content = {
 }
 
 function cleanPublicCaption(value?: string) {
-  const text = String(value || '').trim()
-  if (!text) return 'Campaign photograph'
-  if (/^IMG[-_]/i.test(text)) return 'Campaign photograph'
-  if (/^\d{5,}$/.test(text)) return 'Campaign photograph'
+  const text=String(value||'').trim()
+  if(!text)return 'Campaign photograph'
+  if(/^IMG[-_]/i.test(text))return 'Campaign photograph'
+  if(/^DSC[-_]?/i.test(text))return 'Campaign photograph'
+  if(/^DCIM[-_]?/i.test(text))return 'Campaign photograph'
+  if(/^PXL[-_]/i.test(text))return 'Campaign photograph'
+  if(/^(WA|PHOTO)[-_]?\d+/i.test(text))return 'Campaign photograph'
+  if(/^\d{5,}$/.test(text))return 'Campaign photograph'
   return text
 }
 
@@ -173,9 +177,41 @@ function useContent() {
 }
 
 async function submit(type: string, payload: Record<string, unknown>) {
-  const res = await fetch(`/api/submissions/${type}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-  if (!res.ok) throw new Error('Submission failed')
-  return res.json()
+  const controller=new AbortController()
+  const timeout=window.setTimeout(()=>controller.abort(),20000)
+
+  try{
+    const res=await fetch(`/api/submissions/${type}`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify(payload),
+      signal:controller.signal
+    })
+    const data=await res.json().catch(()=>({}))
+    if(!res.ok){
+      throw new Error(String(data.error||data.message||`Submission failed (${res.status})`))
+    }
+    return data
+  }catch(error){
+    if(error instanceof DOMException && error.name==='AbortError'){
+      throw new Error('The request timed out. Please try again.')
+    }
+    throw error
+  }finally{
+    window.clearTimeout(timeout)
+  }
+}
+
+function normalizeExternalUrl(value?: string) {
+  const raw=String(value||'').trim()
+  if(!raw)return ''
+  if(/^https?:\/\//i.test(raw))return raw
+  return `https://${raw.replace(/^\/+/,'')}`
+}
+
+function whatsappUrl(value?: string) {
+  const digits=String(value||'').replace(/\D/g,'')
+  return digits ? `https://wa.me/${digits}` : '/contact'
 }
 
 function validSocial(url?: string) {
@@ -193,7 +229,7 @@ function SocialLinks({ content, compact = false }: { content: Content; compact?:
 
   if (!links.length) return null
   return <div className={compact ? 'socials top-socials' : 'socials'}>
-    {links.map(item => <a key={item.label} href={item.url} target="_blank" rel="noreferrer" aria-label={item.label}>{item.icon}</a>)}
+    {links.map(item => <a key={item.label} href={normalizeExternalUrl(item.url)} target="_blank" rel="noreferrer" aria-label={item.label}>{item.icon}</a>)}
   </div>
 }
 
@@ -232,11 +268,11 @@ function Layout({ children, content }: { children: React.ReactNode; content: Con
     <div className="topbar"><div className="container topbar-inner"><div className="topbar-message"><span>{content.strapline}</span><SocialLinks content={content} compact/></div><div className="topbar-contact"><a href={`tel:${content.phone.replace(/\s+/g,'')}`}><Phone size={15}/> {content.phone}</a><a href={`mailto:${content.email}`}><Mail size={15}/> {content.email}</a></div></div></div>
     <header className="header"><div className="container nav">
       <a className="brand" href="/"><span className="brand-mark">PK</span><span><strong>{content.candidateName.toUpperCase()}</strong><small>{content.campaignTitle.toUpperCase()}</small></span></a>
-      <nav className={open ? 'nav-links open' : 'nav-links'}>{links.map(([href,label]) => <a key={href} href={href}>{label}</a>)}<a href="/volunteer" className="nav-cta">Join the Movement</a></nav>
+      <nav className={open ? 'nav-links open' : 'nav-links'}>{links.map(([href,label]) => <a key={href} href={href} onClick={()=>setOpen(false)}>{label}</a>)}<a href="/volunteer" className="nav-cta" onClick={()=>setOpen(false)}>Join the Movement</a></nav>
       <button className="menu" aria-label="Toggle navigation" onClick={() => setOpen(!open)}>{open ? <X/> : <Menu/>}</button>
     </div></header>
     <main id="main-content">{children}</main>
-    <a className="whatsapp" href={`https://wa.me/${content.whatsapp}`} target="_blank" rel="noreferrer" aria-label="Chat on WhatsApp"><MessageCircle/></a>
+    <a className="whatsapp" href={whatsappUrl(content.whatsapp)} target="_blank" rel="noreferrer" aria-label="Chat on WhatsApp"><MessageCircle/></a>
     {showTop && <button className="back-top" onClick={() => window.scrollTo({top:0,behavior:'smooth'})}><ChevronUp/></button>}
     <footer><div className="container footer-main">
       <div><div className="brand footer-brand"><span className="brand-mark">PK</span><span><strong>{content.candidateName.toUpperCase()}</strong><small>{content.campaignTitle.toUpperCase()}</small></span></div><p>{content.tagline} for every household.</p></div>
@@ -284,8 +320,8 @@ function HeroSlideshow({ content }: { content: Content }) {
   return <div className="hero-slideshow" aria-label="Campaign image slideshow" onMouseEnter={()=>setPaused(true)} onMouseLeave={()=>setPaused(false)} onFocus={()=>setPaused(true)} onBlur={()=>setPaused(false)}>
     <div className="hero-slide-stage">
       {slides.map((slide,index)=><figure key={slide.id} className={index===active?'hero-slide active':'hero-slide'}>
-        <img src={slide.image_url} alt={slide.alt_text || `Campaign photograph ${index+1}`}/>
-        <figcaption><strong>{content.candidateName}</strong><span>{slide.alt_text || content.strapline}</span></figcaption>
+        <img src={slide.image_url} alt={cleanPublicCaption(slide.alt_text || `Campaign photograph ${index+1}`)}/>
+        <figcaption><strong>{content.candidateName}</strong><span>{cleanPublicCaption(slide.alt_text) || content.strapline}</span></figcaption>
       </figure>)}
     </div>
     {slides.length>1&&<><button className="slide-control previous" aria-label="Previous campaign image" onClick={()=>setActive(current=>(current-1+slides.length)%slides.length)}>‹</button><button className="slide-control next" aria-label="Next campaign image" onClick={()=>setActive(current=>(current+1)%slides.length)}>›</button><div className="slide-dots">{slides.map((slide,index)=><button key={slide.id} className={index===active?'active':''} aria-label={`Show image ${index+1}`} onClick={()=>setActive(index)}/>)}</div></>}
@@ -332,7 +368,7 @@ function NewsPage(){
             {post.image_url && <img src={post.image_url} alt="" loading="lazy"/>}
             <div className="live-news-copy">
               <span>{post.category || 'Campaign Update'}</span>
-              <h2>{post.title}</h2>
+              <h2>{post.slug?<a className="card-title-link" href={`/news/${post.slug}`}>{post.title}</a>:post.title}</h2>
               <p>{post.summary || post.body || ''}</p>
               <div className="live-card-actions">
                 {post.published_at && <small>{new Date(post.published_at).toLocaleDateString()}</small>}
@@ -390,7 +426,7 @@ function EventsPage(){
         <div className="live-events-grid">
           {events.map(event => <article className="live-event-card" key={event.id}>
             <div className="live-event-date">{event.event_date ? new Date(event.event_date).toLocaleDateString(undefined,{month:'short',day:'2-digit'}) : 'TBA'}</div>
-            <div><h3>{event.title}</h3><p>{event.description || ''}</p><small>{[event.venue,event.ward].filter(Boolean).join(' • ')}</small><div><a className="detail-link" href={`/events/${event.id}`}>View event →</a></div></div>
+            <div><h3><a className="card-title-link" href={`/events/${event.id}`}>{event.title}</a></h3><p>{event.description || ''}</p><small>{[event.venue,event.ward].filter(Boolean).join(' • ')}</small><div><a className="detail-link" href={`/events/${event.id}`}>View event →</a></div></div>
           </article>)}
         </div>}
       </div>
@@ -472,7 +508,7 @@ function AlbumViewer({
       <button type="button" className="album-close" onClick={()=>setOpen(false)} aria-label="Close album"><X/></button>
       <button type="button" className="album-prev" onClick={()=>setActive(v=>(v-1+items.length)%items.length)} aria-label="Previous photograph">‹</button>
       <figure>
-        <img src={items[active].image_url} alt={items[active].caption||`Photograph ${active+1}`}/>
+        <img src={items[active].image_url} alt={cleanPublicCaption(items[active].caption||`Photograph ${active+1}`)}/>
         <figcaption>
           <strong>{cleanPublicCaption(items[active].caption)}</strong>
           {items[active].description&&<span>{items[active].description}</span>}
@@ -543,13 +579,105 @@ function MediaPage({ content }: { content: Content }) {
 function ContactPage({ content }: { content: Content }) {
   const [state,setState] = React.useState('')
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); setState('sending'); const data = Object.fromEntries(new FormData(e.currentTarget)); try { await submit('contact', data); setState('sent'); e.currentTarget.reset() } catch { setState('error') } }
-  return <><PageHero kicker="CONTACT THE CAMPAIGN" title="We are ready to hear from you." text="Send a question, invitation, development proposal or media request to the campaign secretariat."/><section className="section contact-section"><div className="container contact-grid"><div><div className="contact-list"><div><MapPin/><span><strong>Campaign Secretariat</strong><small>{content.office}</small></span></div><a href={`tel:${content.phone.replace(/\s+/g,'')}`}><Phone/><span><strong>Telephone</strong><small>{content.phone}</small></span></a><a href={`mailto:${content.email}`}><Mail/><span><strong>Email</strong><small>{content.email}</small></span></a></div></div><form className="contact-form" onSubmit={onSubmit}><div className="form-row"><label>Full name<input name="name" required/></label><label>Phone number<input name="phone" required/></label></div><div className="form-row"><label>Email<input name="email" type="email"/></label><label>Subject<select name="subject" required defaultValue=""><option value="" disabled>Select one</option><option>General enquiry</option><option>Media request</option><option>Event invitation</option><option>Development proposal</option><option>Partnership</option></select></label></div><label>Your message<textarea name="message" required rows={6}/></label><input className="hp-field" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true"/><button className="btn primary submit" disabled={state==='sending'}>{state==='sending'?'Sending…':'Send Message'} <ArrowRight size={18}/></button>{state==='sent'&&<div className="success">Thank you. Your message has been saved.</div>}{state==='error'&&<div className="form-error">Could not submit. Start the API with <strong>npm run api</strong>.</div>}</form></div></section></>
+  return <><PageHero kicker="CONTACT THE CAMPAIGN" title="We are ready to hear from you." text="Send a question, invitation, development proposal or media request to the campaign secretariat."/><section className="section contact-section"><div className="container contact-grid"><div><div className="contact-list"><div><MapPin/><span><strong>Campaign Secretariat</strong><small>{content.office}</small></span></div><a href={`tel:${content.phone.replace(/\s+/g,'')}`}><Phone/><span><strong>Telephone</strong><small>{content.phone}</small></span></a><a href={`mailto:${content.email}`}><Mail/><span><strong>Email</strong><small>{content.email}</small></span></a></div></div><form className="contact-form" onSubmit={onSubmit}><div className="form-row"><label>Full name<input name="name" required/></label><label>Phone number<input name="phone" required/></label></div><div className="form-row"><label>Email<input name="email" type="email"/></label><label>Subject<select name="subject" required defaultValue=""><option value="" disabled>Select one</option><option>General enquiry</option><option>Media request</option><option>Event invitation</option><option>Development proposal</option><option>Partnership</option></select></label></div><label>Your message<textarea name="message" required rows={6}/></label><input className="hp-field" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true"/><button type="submit" className="btn primary submit" disabled={state==='sending'}>{state==='sending'?'Sending…':'Send Message'} <ArrowRight size={18}/></button>{state==='sent'&&<div className="success">Thank you. Your message has been saved.</div>}{state==='error'&&<div className="form-error"><strong>Could not submit your message.</strong><small>Please try again or use the campaign phone, email or WhatsApp links.</small></div>}</form></div></section></>
 }
 
 function VolunteerPage() {
-  const [state,setState]=React.useState('')
-  const onSubmit=async(e:React.FormEvent<HTMLFormElement>)=>{e.preventDefault();setState('sending');const data=Object.fromEntries(new FormData(e.currentTarget));try{await submit('volunteer',data);setState('sent');e.currentTarget.reset()}catch{setState('error')}}
-  return <><PageHero kicker="JOIN THE MOVEMENT" title="Help shape Makueni’s next chapter." text="Register for community outreach, events, policy engagement, communications or grassroots mobilisation." image="/assets/philip-kaloki-media-wide.webp"/><section className="section volunteer-section"><div className="container volunteer-grid"><div><div className="section-kicker">VOLUNTEER NETWORK</div><h2>Choose how you want to contribute.</h2><div className="volunteer-benefits"><span><CheckCircle2/> Community outreach</span><span><CheckCircle2/> Events and mobilisation</span><span><CheckCircle2/> Policy and research</span><span><CheckCircle2/> Communications</span></div></div><form className="contact-form" onSubmit={onSubmit}><div className="form-row"><label>Full name<input name="name" required/></label><label>Phone<input name="phone" required/></label></div><div className="form-row"><label>Ward<input name="ward" required/></label><label>Area of interest<select name="interest" required defaultValue=""><option value="" disabled>Select one</option><option>Community outreach</option><option>Events</option><option>Communications</option><option>Policy and research</option><option>Youth mobilisation</option><option>Women mobilisation</option></select></label></div><label>How would you like to contribute?<textarea name="message" rows={5}/></label><input className="hp-field" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true"/><label className="consent"><input name="consent" type="checkbox" required value="yes"/> I consent to being contacted about campaign activities.</label><button className="btn primary submit">Submit Volunteer Interest <ArrowRight size={18}/></button>{state==='sent'&&<div className="success">Your volunteer registration has been saved.</div>}{state==='error'&&<div className="form-error">Unable to save. Confirm the API server is running.</div>}</form></div></section></>
+  const [state,setState]=React.useState<'idle'|'sending'|'sent'|'error'>('idle')
+  const [errorMessage,setErrorMessage]=React.useState('')
+
+  const onSubmit=async(e:React.FormEvent<HTMLFormElement>)=>{
+    e.preventDefault()
+    const form=e.currentTarget
+    setState('sending')
+    setErrorMessage('')
+
+    const data=Object.fromEntries(new FormData(form))
+
+    try{
+      await submit('volunteer',data)
+      setState('sent')
+      form.reset()
+    }catch(error){
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to save volunteer registration.')
+      setState('error')
+    }
+  }
+
+  return <>
+    <PageHero
+      kicker="JOIN THE MOVEMENT"
+      title="Help shape Makueni’s next chapter."
+      text="Register for community outreach, events, policy engagement, communications or grassroots mobilisation."
+      image="/assets/philip-kaloki-media-wide.webp"
+    />
+    <section className="section volunteer-section">
+      <div className="container volunteer-grid">
+        <div>
+          <div className="section-kicker">VOLUNTEER NETWORK</div>
+          <h2>Choose how you want to contribute.</h2>
+          <div className="volunteer-benefits">
+            <span><CheckCircle2/> Community outreach</span>
+            <span><CheckCircle2/> Events and mobilisation</span>
+            <span><CheckCircle2/> Policy and research</span>
+            <span><CheckCircle2/> Communications</span>
+          </div>
+        </div>
+
+        <form className="contact-form" onSubmit={onSubmit}>
+          <div className="form-row">
+            <label>Full name<input name="name" required autoComplete="name"/></label>
+            <label>Phone<input name="phone" required autoComplete="tel" inputMode="tel"/></label>
+          </div>
+
+          <div className="form-row">
+            <label>Ward<input name="ward" required/></label>
+            <label>Area of interest
+              <select name="interest" required defaultValue="">
+                <option value="" disabled>Select one</option>
+                <option>Community outreach</option>
+                <option>Events</option>
+                <option>Communications</option>
+                <option>Policy and research</option>
+                <option>Youth mobilisation</option>
+                <option>Women mobilisation</option>
+              </select>
+            </label>
+          </div>
+
+          <label>How would you like to contribute?
+            <textarea name="message" rows={5}/>
+          </label>
+
+          <input className="hp-field" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true"/>
+
+          <label className="consent">
+            <input name="consent" type="checkbox" required value="yes"/>
+            I consent to being contacted about campaign activities.
+          </label>
+
+          <button type="submit" className="btn primary submit" disabled={state==='sending'}>
+            {state==='sending'?'Submitting…':'Submit Volunteer Interest'} <ArrowRight size={18}/>
+          </button>
+
+          {state==='sent'&&
+            <div className="success">
+              <strong>Registration received.</strong>
+              <span>Your volunteer details have been saved successfully.</span>
+            </div>
+          }
+
+          {state==='error'&&
+            <div className="form-error">
+              <strong>Unable to save volunteer registration.</strong>
+              <span>{errorMessage}</span>
+              <small>Please try again or contact the campaign using the phone, email or WhatsApp links.</small>
+            </div>
+          }
+        </form>
+      </div>
+    </section>
+  </>
 }
 
 function NewsletterSection() {
@@ -682,6 +810,7 @@ function SiteImagesManager({ content, setContent, adminKey }: { content: Content
   const [bulkCaption,setBulkCaption]=React.useState('')
   const [bulkDescription,setBulkDescription]=React.useState('')
   const [selected,setSelected]=React.useState<Set<string>>(new Set())
+  const [folderOpen,setFolderOpen]=React.useState(false)
 
   const headers={'x-admin-key':adminKey,'Content-Type':'application/json'}
   const load=async()=>{
@@ -851,32 +980,52 @@ function SiteImagesManager({ content, setContent, adminKey }: { content: Content
       </details>
     </section>
 
-    <section className="slides-admin-list compact">
-      <div className="cms-records-head">
-        <div><h2>Slideshow images</h2><span>{slides.length} images</span></div>
-        {slides.length>0&&<div className="bulk-actions">
-          <button type="button" onClick={selectAll}>{selected.size===slides.length?'Clear selection':'Select all'}</button>
-          <button type="button" className="bulk-delete" disabled={!selected.size||busy} onClick={deleteSelected}><Trash2/> Delete selected ({selected.size})</button>
-        </div>}
-      </div>
+    <section className="slides-admin-list compact homepage-folder-section">
+      <button
+        type="button"
+        className={folderOpen?'homepage-image-folder open':'homepage-image-folder'}
+        onClick={()=>setFolderOpen(v=>!v)}
+        aria-expanded={folderOpen}
+      >
+        <div className="folder-icon">📁</div>
+        <div className="folder-copy">
+          <span className="section-kicker">HOMEPAGE IMAGES</span>
+          <h2>Homepage Images folder</h2>
+          <p>{slides.length} image{slides.length===1?'':'s'} stored here. Click the folder to {folderOpen?'close':'open'} the album.</p>
+        </div>
+        <div className="folder-preview">
+          {slides.slice(0,4).map(slide=><img key={slide.id} src={slide.image_url} alt=""/>)}
+        </div>
+        <span className="folder-toggle">{folderOpen?'Close album':'Open album'}</span>
+      </button>
 
-      {slides.length===0?<div className="empty-state"><ImageIcon/><h3>No database slides yet</h3></div>:
-      <div className="slides-admin-grid">
-        {slides.map((slide,index)=><article key={slide.id} className={selected.has(slide.id)?'selected':''}>
-          <label className="slide-select"><input type="checkbox" checked={selected.has(slide.id)} onChange={()=>toggleSelected(slide.id)}/></label>
-          <img src={slide.image_url} alt=""/>
-          <div className="slide-card-copy">
-            <strong>{cleanPublicCaption(slide.alt_text||`Slideshow image ${index+1}`)}</strong>
-            {slide.description&&<p>{slide.description}</p>}
-            <span>{slide.is_active?'Active':'Hidden'}</span>
-          </div>
-          <div className="slide-admin-actions">
-            <button type="button" onClick={()=>move(index,-1)} disabled={index===0} aria-label="Move earlier"><ArrowUp/></button>
-            <button type="button" onClick={()=>move(index,1)} disabled={index===slides.length-1} aria-label="Move later"><ArrowDown/></button>
-            <button type="button" onClick={()=>toggle(slide)}>{slide.is_active?'Hide':'Show'}</button>
-            <button type="button" className="danger-icon" onClick={()=>remove(slide.id)}><Trash2/></button>
-          </div>
-        </article>)}
+      {folderOpen&&<div className="folder-contents">
+        <div className="cms-records-head">
+          <div><h2>Slideshow images</h2><span>{slides.length} images</span></div>
+          {slides.length>0&&<div className="bulk-actions">
+            <button type="button" onClick={selectAll}>{selected.size===slides.length?'Clear selection':'Select all'}</button>
+            <button type="button" className="bulk-delete" disabled={!selected.size||busy} onClick={deleteSelected}><Trash2/> Delete selected ({selected.size})</button>
+          </div>}
+        </div>
+
+        {slides.length===0?<div className="empty-state"><ImageIcon/><h3>No database slides yet</h3></div>:
+        <div className="slides-admin-grid">
+          {slides.map((slide,index)=><article key={slide.id} className={selected.has(slide.id)?'selected':''}>
+            <label className="slide-select"><input type="checkbox" checked={selected.has(slide.id)} onChange={()=>toggleSelected(slide.id)}/></label>
+            <img src={slide.image_url} alt=""/>
+            <div className="slide-card-copy">
+              <strong>{cleanPublicCaption(slide.alt_text||`Slideshow image ${index+1}`)}</strong>
+              {slide.description&&<p>{slide.description}</p>}
+              <span>{slide.is_active?'Active':'Hidden'}</span>
+            </div>
+            <div className="slide-admin-actions">
+              <button type="button" onClick={()=>move(index,-1)} disabled={index===0} aria-label="Move earlier"><ArrowUp/></button>
+              <button type="button" onClick={()=>move(index,1)} disabled={index===slides.length-1} aria-label="Move later"><ArrowDown/></button>
+              <button type="button" onClick={()=>toggle(slide)}>{slide.is_active?'Hide':'Show'}</button>
+              <button type="button" className="danger-icon" onClick={()=>remove(slide.id)}><Trash2/></button>
+            </div>
+          </article>)}
+        </div>}
       </div>}
     </section>
 
@@ -924,7 +1073,7 @@ function AdminPage({ content, setContent }: { content: Content; setContent: Reac
 
   const title={dashboard:'Command Dashboard',inbox:'Submission Inbox',content:'Official Website Content',news:'Newsroom Manager',events:'Events Manager',media:'Media Library',images:'Homepage Images',social:'Social Media',audit:'Audit Trail'}[tab]
   const statCards=[['Contacts',stats.contact_submissions||0,<Mail/>],['Volunteers',stats.volunteer_submissions||0,<Users/>],['Citizen ideas',stats.citizen_ideas||0,<MessageCircle/>],['Subscribers',stats.newsletter_subscribers||0,<Inbox/>],['News posts',stats.news_posts||0,<Newspaper/>],['Events',stats.events||0,<Calendar/>],['Media',stats.media_assets||0,<ImageIcon/>]]
-  return <section className="admin-shell cms-v17"><aside className="admin-sidebar"><div className="brand"><span className="brand-mark">PK</span><span><strong>CAMPAIGN CMS</strong><small>SUPABASE • PHASE 26</small></span></div>
+  return <section className="admin-shell cms-v17"><aside className="admin-sidebar"><div className="brand"><span className="brand-mark">PK</span><span><strong>CAMPAIGN CMS</strong><small>SUPABASE • PHASE 29</small></span></div>
     <button className={tab==='dashboard'?'active':''} onClick={()=>changeTab('dashboard')}><LayoutDashboard/> Dashboard</button>
     <button className={tab==='inbox'?'active':''} onClick={()=>changeTab('inbox')}><Inbox/> Submissions</button>
     <button className={tab==='content'?'active':''} onClick={()=>changeTab('content')}><Settings/> Website content</button>

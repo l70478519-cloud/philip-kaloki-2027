@@ -248,3 +248,47 @@ footer a{color:inherit}
   .album-lightbox{grid-template-columns:52px minmax(0,1fr) 52px;padding:15px}
   .album-prev,.album-next{width:42px;height:42px;font-size:28px}
 }
+
+
+/* Phase 27 — homepage image folder + link audit */
+.homepage-folder-section{padding:0!important;overflow:hidden}
+.homepage-image-folder{width:100%;border:0;background:linear-gradient(135deg,#f8fbf9,#eef6f2);padding:22px;display:grid;grid-template-columns:64px minmax(220px,1fr) minmax(180px,320px) auto;gap:18px;align-items:center;text-align:left;cursor:pointer}
+.homepage-image-folder:hover{background:#edf7f2}
+.folder-icon{width:58px;height:52px;border-radius:12px;background:#e0b743;display:grid;place-items:center;font-size:30px;box-shadow:0 8px 20px rgba(91,70,14,.15)}
+.folder-copy h2{margin:4px 0;color:#0b2f50}
+.folder-copy p{margin:0;color:#687584}
+.folder-preview{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.folder-preview img{width:100%;height:64px;object-fit:contain;background:#fff;border-radius:8px;border:1px solid #dbe5e0}
+.folder-toggle{font-weight:800;color:#0d8055;white-space:nowrap}
+.folder-contents{padding:20px;border-top:1px solid #dce5e1}
+.card-title-link{color:inherit;text-decoration:none}
+.card-title-link:hover{color:#0d8055;text-decoration:underline}
+a:focus-visible,button:focus-visible{outline:3px solid #f2bd2d;outline-offset:3px}
+.nav-links a,.hero-actions a,.text-link,.detail-link,.participate-grid a,.footer-main a,.footer-bottom a{touch-action:manipulation}
+@media(max-width:900px){
+  .homepage-image-folder{grid-template-columns:52px 1fr auto}
+  .folder-preview{grid-column:1/-1}
+}
+@media(max-width:560px){
+  .homepage-image-folder{grid-template-columns:46px 1fr}
+  .folder-toggle{grid-column:1/-1}
+  .folder-preview img{height:54px}
+}
+
+
+/* Phase 28 — functional links and public form feedback */
+.brand-link{color:inherit;text-decoration:none}
+.brand-link:hover strong{color:#0d8055}
+.form-error{display:grid;gap:5px}
+.form-error span{font-weight:700}
+.form-error small{line-height:1.45}
+.admin-nav-link{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit}
+a[href^="tel:"],a[href^="mailto:"],a[href^="https://wa.me"]{touch-action:manipulation}
+
+
+/* Phase 29 — public registrations, clean labels and image-folder polish */
+.brand-link{color:inherit;text-decoration:none}
+.form-error,.success{display:grid;gap:5px}
+.form-error span,.success span{line-height:1.45}
+.homepage-image-folder{cursor:pointer}
+.hero-slideshow figcaption span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
