@@ -24,6 +24,10 @@ type Content = {
   instagram: string
   youtube: string
   contentStatus: string
+  heroImage1: string
+  heroImage2: string
+  heroImage3: string
+  aboutImage: string
 }
 
 type LiveNewsPost = {
@@ -97,7 +101,11 @@ const fallbackContent: Content = {
   email: 'info@philipkaloki.com', whatsapp: '254700000000', office: 'Wote, Makueni County',
   heroText: 'A people-centred movement committed to practical solutions, accountable leadership and opportunity for every family in Makueni County.',
   biography: 'Prof. Philip Kaloki’s leadership journey is founded on public service, professional excellence and a deep commitment to improving lives. His 2027 agenda places communities at the centre of county development.',
-  facebook: '#', instagram: '#', youtube: '#', contentStatus: 'Replace placeholder contact details and campaign wording with formally approved information before public launch.'
+  facebook: '#', instagram: '#', youtube: '#', contentStatus: 'Replace placeholder contact details and campaign wording with formally approved information before public launch.',
+  heroImage1: '/assets/philip-kaloki-portrait-hero.webp',
+  heroImage2: '/assets/philip-kaloki-field.webp',
+  heroImage3: '/assets/philip-kaloki-media-wide.webp',
+  aboutImage: '/assets/philip-kaloki-office.webp'
 }
 
 const priorities = [
@@ -156,12 +164,91 @@ function PageHero({ kicker, title, text, image }: { kicker: string; title: strin
   return <section className="page-hero"><div className="container page-hero-grid"><div><div className="eyebrow">{kicker}</div><h1>{title}</h1><p>{text}</p></div>{image && <img src={image} alt=""/>}</div></section>
 }
 
+
+function HeroSlideshow({ content }: { content: Content }) {
+  const slides = [
+    { src: content.heroImage1 || fallbackContent.heroImage1, label: 'Leadership for Makueni' },
+    { src: content.heroImage2 || fallbackContent.heroImage2, label: 'Listening across the county' },
+    { src: content.heroImage3 || fallbackContent.heroImage3, label: 'A people-centred campaign' }
+  ].filter(slide => Boolean(slide.src))
+
+  const [active, setActive] = React.useState(0)
+
+  React.useEffect(() => {
+    if (slides.length <= 1) return
+    const timer = window.setInterval(
+      () => setActive(current => (current + 1) % slides.length),
+      5000
+    )
+    return () => window.clearInterval(timer)
+  }, [slides.length])
+
+  React.useEffect(() => {
+    if (active >= slides.length) setActive(0)
+  }, [active, slides.length])
+
+  if (!slides.length) return null
+
+  return (
+    <div className="hero-slideshow" aria-label="Campaign image slideshow">
+      <div className="hero-slide-stage">
+        {slides.map((slide, index) => (
+          <figure
+            key={`${slide.src}-${index}`}
+            className={index === active ? 'hero-slide active' : 'hero-slide'}
+          >
+            <img src={slide.src} alt={slide.label} />
+            <figcaption>
+              <strong>{content.candidateName}</strong>
+              <span>{slide.label}</span>
+            </figcaption>
+          </figure>
+        ))}
+      </div>
+
+      {slides.length > 1 && (
+        <>
+          <button
+            className="slide-control previous"
+            aria-label="Previous campaign image"
+            onClick={() =>
+              setActive(current => (current - 1 + slides.length) % slides.length)
+            }
+          >
+            ‹
+          </button>
+          <button
+            className="slide-control next"
+            aria-label="Next campaign image"
+            onClick={() =>
+              setActive(current => (current + 1) % slides.length)
+            }
+          >
+            ›
+          </button>
+
+          <div className="slide-dots" aria-label="Choose campaign image">
+            {slides.map((_, index) => (
+              <button
+                key={index}
+                className={index === active ? 'active' : ''}
+                aria-label={`Show image ${index + 1}`}
+                onClick={() => setActive(index)}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 function HomePage({ content }: { content: Content }) {
   return <>
-    <section className="hero"><div className="container hero-grid"><div className="hero-copy"><div className="eyebrow">A NEW CHAPTER FOR MAKUENI</div><h1>Development.<br/><span>Integrity.</span><br/>Prosperity.</h1><p>{content.heroText}</p><div className="hero-actions"><a className="btn primary" href="/agenda">Explore the Agenda <ArrowRight size={18}/></a><a className="btn secondary" href="/volunteer">Become a Volunteer</a></div><div className="trust-row"><span><CheckCircle2/> Experienced leadership</span><span><CheckCircle2/> People-first development</span></div></div><div className="candidate-card"><div className="portrait-photo"><img src="/assets/philip-kaloki-portrait-hero.webp" alt="Prof. Philip Kaloki"/></div><div className="candidate-caption"><strong>{content.candidateName}</strong><span>For Governor • Makueni County 2027</span></div></div></div></section>
+    <section className="hero"><div className="container hero-grid"><div className="hero-copy"><div className="eyebrow">A NEW CHAPTER FOR MAKUENI</div><h1>Development.<br/><span>Integrity.</span><br/>Prosperity.</h1><p>{content.heroText}</p><div className="hero-actions"><a className="btn primary" href="/agenda">Explore the Agenda <ArrowRight size={18}/></a><a className="btn secondary" href="/volunteer">Become a Volunteer</a></div><div className="trust-row"><span><CheckCircle2/> Experienced leadership</span><span><CheckCircle2/> People-first development</span></div></div><HeroSlideshow content={content}/></div></section>
     <section className="quick-impact"><div className="container impact-grid"><div><strong>30</strong><span>Wards to be heard</span></div><div><strong>6</strong><span>Core priorities</span></div><div><strong>1</strong><span>United county vision</span></div><div><strong>Every</strong><span>Household matters</span></div></div></section>
     <section className="statement"><div className="container statement-grid"><div><span>OUR COMMITMENT</span><h2>A government that works for the people.</h2></div><p>Progress must be visible in ordinary lives—in working hospitals, productive farms, thriving businesses, empowered young people and institutions that serve with integrity.</p></div></section>
-    <section className="section"><div className="container split"><div className="image-panel about-photo"><img src="/assets/philip-kaloki-office.webp" alt="Prof. Philip Kaloki"/><div className="image-label">Leadership • Service • Results</div></div><div className="content"><div className="section-kicker">MEET THE CANDIDATE</div><h2>Proven leadership with a clear vision for Makueni.</h2><p>{content.biography}</p><div className="mini-points"><div><ShieldCheck/><span><strong>Integrity in leadership</strong><small>Transparent decisions and responsible use of public resources.</small></span></div><div><Users/><span><strong>Inclusive development</strong><small>Every ward, village and household must participate in Makueni’s progress.</small></span></div><div><Target/><span><strong>Measurable delivery</strong><small>Clear priorities and published progress.</small></span></div></div><a className="text-link" href="/about">Read full profile <ArrowRight size={17}/></a></div></div></section>
+    <section className="section"><div className="container split"><div className="image-panel about-photo"><img src={content.aboutImage || fallbackContent.aboutImage} alt="Prof. Philip Kaloki"/><div className="image-label">Leadership • Service • Results</div></div><div className="content"><div className="section-kicker">MEET THE CANDIDATE</div><h2>Proven leadership with a clear vision for Makueni.</h2><p>{content.biography}</p><div className="mini-points"><div><ShieldCheck/><span><strong>Integrity in leadership</strong><small>Transparent decisions and responsible use of public resources.</small></span></div><div><Users/><span><strong>Inclusive development</strong><small>Every ward, village and household must participate in Makueni’s progress.</small></span></div><div><Target/><span><strong>Measurable delivery</strong><small>Clear priorities and published progress.</small></span></div></div><a className="text-link" href="/about">Read full profile <ArrowRight size={17}/></a></div></div></section>
     <section className="vision-section"><div className="container center-heading"><div className="section-kicker light">THE 2027 DEVELOPMENT AGENDA</div><h2>Practical priorities. Visible results.</h2></div><div className="container cards six-cards">{priorities.map(p => <article className="pillar" key={p.title}><div className="icon-wrap">{p.icon}</div><h3>{p.title}</h3><p>{p.text}</p></article>)}</div><div className="container home-more"><a className="btn secondary" href="/agenda">Read the Full Agenda <ArrowRight size={17}/></a></div></section>
     <section className="updates-section section"><div className="container section-heading-row"><div><div className="section-kicker">LATEST FROM THE MOVEMENT</div><h2>Updates and conversations.</h2></div><a className="text-link" href="/news">View all updates <ArrowRight size={17}/></a></div><div className="container update-grid">{news.map(item => <article className="update-card" key={item.title}><div className="update-image photo-update"><img src={item.image} alt=""/></div><div className="update-body"><span>{item.tag}</span><small><CalendarDays/> Campaign update</small><h3>{item.title}</h3><p>Read the latest campaign brief, community engagement update and development conversation.</p><a href="/news">Read more <ArrowRight size={15}/></a></div></article>)}</div></section>
     <section className="participate-section section"><div className="container center-heading"><div className="section-kicker light">GET INVOLVED</div><h2>There is a place for every supporter.</h2></div><div className="container participate-grid"><article><Users/><span>01</span><h3>Volunteer</h3><p>Support outreach, events and local engagement.</p><a href="/volunteer">Register interest <ArrowRight size={15}/></a></article><article><Megaphone/><span>02</span><h3>Host a dialogue</h3><p>Invite the campaign to a community conversation.</p><a href="/contact">Send invitation <ArrowRight size={15}/></a></article><article><FileText/><span>03</span><h3>Share policy ideas</h3><p>Send practical proposals for Makueni.</p><a href="/contact">Share an idea <ArrowRight size={15}/></a></article><article><Newspaper/><span>04</span><h3>Media requests</h3><p>Request interviews or campaign information.</p><a href="/media">Media centre <ArrowRight size={15}/></a></article></div></section>
@@ -329,57 +416,33 @@ function MediaPage({ content }: { content: Content }) {
       <section className="section">
         <div className="container">
           {loading ? (
-            <div className="cms-empty public-empty">
-              Loading media…
-            </div>
+            <div className="cms-empty public-empty">Loading media…</div>
           ) : media.length === 0 ? (
             <div className="cms-empty public-empty">
+              <ImageIcon/>
               <h3>No published media yet</h3>
               <p>
-                Media uploaded and published through the campaign
-                CMS will automatically appear here.
+                Media uploaded and published through the campaign CMS
+                will automatically appear here.
               </p>
             </div>
           ) : (
             <div className="live-media-grid">
               {media.map(item => (
-                <article
-                  className="live-media-card"
-                  key={item.id}
-                >
+                <article className="live-media-card" key={item.id}>
                   {(item.thumbnail_url || item.file_url) && (
                     <img
-                      src={
-                        item.thumbnail_url ||
-                        item.file_url
-                      }
-                      alt={
-                        item.title ||
-                        'Campaign media'
-                      }
+                      src={item.thumbnail_url || item.file_url}
+                      alt={item.title || 'Campaign media'}
                       loading="lazy"
                     />
                   )}
-
                   <div>
-                    <span>
-                      {item.asset_type || 'Media'}
-                    </span>
-
-                    <h3>
-                      {item.title || 'Campaign Media'}
-                    </h3>
-
-                    {item.description && (
-                      <p>{item.description}</p>
-                    )}
-
+                    <span>{item.asset_type || 'Media'}</span>
+                    <h3>{item.title || 'Campaign Media'}</h3>
+                    {item.description && <p>{item.description}</p>}
                     {item.file_url && (
-                      <a
-                        href={item.file_url}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
+                      <a href={item.file_url} target="_blank" rel="noreferrer">
                         View media →
                       </a>
                     )}
@@ -445,20 +508,178 @@ function updateSeo(path: string, content: Content) {
   if(canonical) canonical.href=window.location.origin+path
 }
 
-type AdminTab = 'dashboard'|'inbox'|'content'|'news'|'events'|'media'|'audit'
+type AdminTab = 'dashboard'|'inbox'|'content'|'news'|'events'|'media'|'images'|'audit'
 type CmsRow = Record<string, any> & { id: string }
 
 
 async function uploadAdminFile(file: File, key: string) {
   const body = new FormData()
   body.append('file', file)
+
   const response = await fetch('/api/admin/upload', {
     method: 'POST',
     headers: { 'x-admin-key': key },
     body
   })
-  if (!response.ok) throw new Error('Upload failed')
-  return response.json()
+
+  if (!response.ok) {
+    const detail = await response.json().catch(() => ({}))
+    throw new Error(detail.error || 'Upload failed')
+  }
+
+  return response.json() as Promise<{ ok: boolean; url: string; path: string }>
+}
+
+
+function AdminUploadField({
+  name,
+  label,
+  defaultValue,
+  adminKey,
+  accept = 'image/*',
+  required = false
+}: {
+  name: string
+  label: string
+  defaultValue?: string
+  adminKey: string
+  accept?: string
+  required?: boolean
+}) {
+  const [url, setUrl] = React.useState(defaultValue || '')
+  const [uploading, setUploading] = React.useState(false)
+  const [error, setError] = React.useState('')
+
+  React.useEffect(() => {
+    setUrl(defaultValue || '')
+  }, [defaultValue])
+
+  const choose = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setUploading(true)
+    setError('')
+
+    try {
+      const result = await uploadAdminFile(file, adminKey)
+      setUrl(result.url)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Upload failed')
+    } finally {
+      setUploading(false)
+      event.target.value = ''
+    }
+  }
+
+  return (
+    <label className="cms-upload-field">
+      {label}
+      <input
+        name={name}
+        value={url}
+        required={required}
+        onChange={e => setUrl(e.target.value)}
+        placeholder="Upload a file or paste an image URL"
+      />
+      <div className="cms-upload-box">
+        <input type="file" accept={accept} onChange={choose} />
+        <span>{uploading ? 'Uploading to Supabase…' : 'Choose file from computer'}</span>
+      </div>
+      {url && accept.startsWith('image/') && (
+        <img className="cms-upload-preview" src={url} alt="" />
+      )}
+      {error && <small className="cms-upload-error">{error}</small>}
+    </label>
+  )
+}
+
+function SiteImagesManager({
+  content,
+  setContent,
+  adminKey
+}: {
+  content: Content
+  setContent: React.Dispatch<React.SetStateAction<Content>>
+  adminKey: string
+}) {
+  const [busy, setBusy] = React.useState(false)
+  const [message, setMessage] = React.useState('')
+
+  const save = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setBusy(true)
+    setMessage('')
+
+    const data = Object.fromEntries(new FormData(event.currentTarget))
+
+    const response = await fetch('/api/admin/content', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-key': adminKey
+      },
+      body: JSON.stringify(data)
+    })
+
+    if (response.ok) {
+      const next = await response.json()
+      setContent(previous => ({ ...fallbackContent, ...previous, ...next }))
+      setMessage('Homepage images updated. Refresh the public website to view them.')
+    } else {
+      setMessage('Unable to save image settings.')
+    }
+
+    setBusy(false)
+  }
+
+  return (
+    <form className="site-images-manager" onSubmit={save}>
+      <div className="cms-create-title">
+        <ImageIcon/>
+        <div>
+          <h2>Homepage & cover images</h2>
+          <p>
+            Upload new campaign photographs directly to Supabase.
+            The homepage slideshow rotates automatically every five seconds.
+          </p>
+        </div>
+      </div>
+
+      <div className="site-image-grid">
+        <AdminUploadField
+          name="heroImage1"
+          label="Slideshow image 1"
+          defaultValue={content.heroImage1}
+          adminKey={adminKey}
+        />
+        <AdminUploadField
+          name="heroImage2"
+          label="Slideshow image 2"
+          defaultValue={content.heroImage2}
+          adminKey={adminKey}
+        />
+        <AdminUploadField
+          name="heroImage3"
+          label="Slideshow image 3"
+          defaultValue={content.heroImage3}
+          adminKey={adminKey}
+        />
+        <AdminUploadField
+          name="aboutImage"
+          label="About / cover image"
+          defaultValue={content.aboutImage}
+          adminKey={adminKey}
+        />
+      </div>
+
+      {message && <div className="admin-message">{message}</div>}
+
+      <button className="btn primary" disabled={busy}>
+        <Save/> {busy ? 'Saving…' : 'Save Image Changes'}
+      </button>
+    </form>
+  )
 }
 
 function AdminPage({ content, setContent }: { content: Content; setContent: React.Dispatch<React.SetStateAction<Content>> }) {
@@ -485,37 +706,285 @@ function AdminPage({ content, setContent }: { content: Content; setContent: Reac
 
   if(!logged) return <section className="admin-shell"><div className="admin-login"><LockKeyhole/><h1>Campaign Admin</h1><p>Secure content management for the Philip Kaloki campaign website.</p><form onSubmit={login}><input type="password" value={key} onChange={e=>setKey(e.target.value)} placeholder="Admin key"/><button className="btn primary">Sign in</button></form>{message&&<div className="form-error">{message}</div>}<a href="/">← Back to website</a></div></section>
 
-  const title={dashboard:'Command Dashboard',inbox:'Submission Inbox',content:'Official Website Content',news:'Newsroom Manager',events:'Events Manager',media:'Media Library',audit:'Audit Trail'}[tab]
+  const title={dashboard:'Command Dashboard',inbox:'Submission Inbox',content:'Official Website Content',news:'Newsroom Manager',events:'Events Manager',media:'Media Library',images:'Homepage Images',audit:'Audit Trail'}[tab]
   const statCards=[['Contacts',stats.contact_submissions||0,<Mail/>],['Volunteers',stats.volunteer_submissions||0,<Users/>],['Citizen ideas',stats.citizen_ideas||0,<MessageCircle/>],['Subscribers',stats.newsletter_subscribers||0,<Inbox/>],['News posts',stats.news_posts||0,<Newspaper/>],['Events',stats.events||0,<Calendar/>],['Media',stats.media_assets||0,<ImageIcon/>]]
-  return <section className="admin-shell cms-v17"><aside className="admin-sidebar"><div className="brand"><span className="brand-mark">PK</span><span><strong>CAMPAIGN CMS</strong><small>SUPABASE • PHASE 17</small></span></div>
+  return <section className="admin-shell cms-v17"><aside className="admin-sidebar"><div className="brand"><span className="brand-mark">PK</span><span><strong>CAMPAIGN CMS</strong><small>SUPABASE • PHASE 20</small></span></div>
     <button className={tab==='dashboard'?'active':''} onClick={()=>changeTab('dashboard')}><LayoutDashboard/> Dashboard</button>
     <button className={tab==='inbox'?'active':''} onClick={()=>changeTab('inbox')}><Inbox/> Submissions</button>
     <button className={tab==='content'?'active':''} onClick={()=>changeTab('content')}><Settings/> Website content</button>
     <button className={tab==='news'?'active':''} onClick={()=>changeTab('news')}><Newspaper/> News</button>
     <button className={tab==='events'?'active':''} onClick={()=>changeTab('events')}><Calendar/> Events</button>
     <button className={tab==='media'?'active':''} onClick={()=>changeTab('media')}><ImageIcon/> Media</button>
+    <button className={tab==='images'?'active':''} onClick={()=>changeTab('images')}><ImageIcon/> Homepage images</button>
     <button className={tab==='audit'?'active':''} onClick={()=>changeTab('audit')}><Activity/> Audit log</button>
     <a href="/"><Eye/> View website</a><button onClick={()=>{sessionStorage.removeItem('pk-admin-key');location.reload()}}><LogOut/> Sign out</button></aside>
     <div className="admin-main"><div className="admin-top"><div><span>CAMPAIGN SECRETARIAT</span><h1>{title}</h1></div><button className="admin-refresh" onClick={()=>changeTab(tab)}><RefreshCw/> Refresh</button></div>{message&&<div className="admin-message">{message}</div>}
     {tab==='dashboard'&&<><div className="cms-stat-grid">{statCards.map(([label,value,icon])=><article key={String(label)}><span>{icon as React.ReactNode}</span><strong>{String(value)}</strong><small>{String(label)}</small></article>)}</div><div className="cms-welcome"><Database/><div><h2>Supabase CMS connected</h2><p>Website content, enquiries, volunteer records, news, events, media records and audit activity are managed from one production database.</p></div></div></>}
     {tab==='inbox'&&<div className="submission-list">{rows.length===0?<div className="empty-state"><Inbox/><h3>No submissions yet</h3><p>Website submissions will appear here.</p></div>:rows.map(r=><article key={r.id}><div className="submission-head"><span className={`status ${r.status}`}>{r.status==='new'?<Clock3/>:<Check/>}{r.status}</span><strong>{(r.type||'submission').toUpperCase()}</strong><small>{new Date(r.createdAt).toLocaleString()}</small></div><h3>{r.name||r.email||'Website submission'}</h3><p>{r.message||r.subject||r.interest||'Newsletter subscription'}</p><div className="submission-meta">{Object.entries(r).filter(([k])=>!['id','type','createdAt','status','message'].includes(k)).slice(0,7).map(([k,v])=><span key={k}><b>{k}:</b> {String(v||'—')}</span>)}</div><div className="cms-actions"><button onClick={()=>changeStatus(r,'reviewed')}>Reviewed</button><button onClick={()=>changeStatus(r,'closed')}>Close</button></div></article>)}</div>}
     {tab==='content'&&<form className="admin-content-form cms-content" onSubmit={saveContent}>{Object.entries(content).map(([k,v])=><label key={k}>{k}<textarea name={k} defaultValue={v||''} rows={k==='biography'||k==='heroText'?4:2}/></label>)}<button disabled={busy} className="btn primary"><Save/> {busy?'Saving…':'Save Official Content'}</button></form>}
-    {tab==='news'&&<CmsManager kind="news" rows={cmsRows} busy={busy} onSave={saveCms} onDelete={deleteCms}/>}
-    {tab==='events'&&<CmsManager kind="events" rows={cmsRows} busy={busy} onSave={saveCms} onDelete={deleteCms}/>}
-    {tab==='media'&&<CmsManager kind="media" rows={cmsRows} busy={busy} onSave={saveCms} onDelete={deleteCms}/>}
+    {tab==='news'&&<CmsManager kind="news" rows={cmsRows} busy={busy} onSave={saveCms} onDelete={deleteCms} adminKey={key}/>}
+    {tab==='events'&&<CmsManager kind="events" rows={cmsRows} busy={busy} onSave={saveCms} onDelete={deleteCms} adminKey={key}/>}
+    {tab==='media'&&<CmsManager kind="media" rows={cmsRows} busy={busy} onSave={saveCms} onDelete={deleteCms} adminKey={key}/>}
+    {tab==='images'&&<SiteImagesManager content={content} setContent={setContent} adminKey={key}/>}
     {tab==='audit'&&<div className="audit-list">{cmsRows.map(r=><article key={r.id}><Activity/><div><strong>{String(r.action||'Activity')}</strong><span>{String(r.entity_type||'system')} {r.entity_id?`• ${r.entity_id}`:''}</span><small>{r.created_at?new Date(r.created_at).toLocaleString():''}</small></div></article>)}</div>}
     </div></section>
 }
 
-function CmsManager({kind,rows,busy,onSave,onDelete}:{kind:'news'|'events'|'media';rows:CmsRow[];busy:boolean;onSave:(kind:'news'|'events'|'media',e:React.FormEvent<HTMLFormElement>,id?:string)=>void;onDelete:(kind:'news'|'events'|'media',id:string)=>void}){
-  const [editing,setEditing]=React.useState<CmsRow|null>(null)
-  React.useEffect(()=>setEditing(null),[kind])
-  return <div className="cms-manager"><form key={editing?.id||`new-${kind}`} className="cms-create" onSubmit={e=>{onSave(kind,e,editing?.id);setEditing(null)}}><div className="cms-create-title"><Plus/><div><h2>{editing?'Edit':'Create'} {kind==='news'?'news post':kind==='events'?'event':'media item'}</h2><p>Saved directly to Supabase.</p></div></div>
-    {kind==='news'&&<><label>Title<input name="title" required defaultValue={editing?.title||''}/> </label><label>Slug<input name="slug" placeholder="e.g. makueni-community-listening" defaultValue={editing?.slug||''}/> </label><label>Category<input name="category" placeholder="Campaign Update" defaultValue={editing?.category||''}/> </label><label>Summary<textarea name="summary" rows={3} defaultValue={editing?.summary||''}/> </label><label>Full article<textarea name="body" rows={6} defaultValue={editing?.body||''}/> </label><label>Image URL<input name="image_url" placeholder="Upload below or paste /assets/... or https://..." defaultValue={editing?.image_url||''}/> </label><input type="hidden" name="published" value="true"/><input type="hidden" name="published_at" value={new Date().toISOString()}/></>}
-    {kind==='events'&&<><label>Event title<input name="title" required defaultValue={editing?.title||''}/> </label><label>Venue<input name="venue" defaultValue={editing?.venue||''}/> </label><label>Ward<input name="ward" defaultValue={editing?.ward||''}/> </label><label>Date and time<input name="event_date" type="datetime-local" defaultValue={editing?.event_date?String(editing.event_date).slice(0,16):''}/> </label><label>Description<textarea name="description" rows={4} defaultValue={editing?.description||''}/> </label><label>Image URL<input name="image_url" defaultValue={editing?.image_url||''}/> </label><input type="hidden" name="published" value="true"/></>}
-    {kind==='media'&&<><label>Title<input name="title" required defaultValue={editing?.title||''}/> </label><label>Type<select name="asset_type" defaultValue={editing?.asset_type||"photo"}><option value="photo">Photo</option><option value="video">Video</option><option value="document">Document</option></select></label><label>File / media URL<input name="file_url" required defaultValue={editing?.file_url||''}/> </label><label>Thumbnail URL<input name="thumbnail_url" defaultValue={editing?.thumbnail_url||''}/> </label><label>Description<textarea name="description" rows={4} defaultValue={editing?.description||''}/> </label><input type="hidden" name="published" value="true"/></>}
-    <div className="cms-form-actions"><button className="btn primary" disabled={busy}><Save/> {busy?'Saving…':editing?'Save Changes':'Publish'}</button>{editing&&<button type="button" className="cms-cancel" onClick={()=>setEditing(null)}>Cancel edit</button>}</div></form>
-    <div className="cms-records"><div className="cms-records-head"><h2>Existing {kind}</h2><span>{rows.length} records</span></div>{rows.length===0?<div className="empty-state"><FileText/><h3>No records yet</h3><p>Create the first item using the form.</p></div>:rows.map(r=><article key={r.id}><div><small>{String(r.category||r.asset_type||r.ward||kind)}</small><h3>{String(r.title||'Untitled')}</h3><p>{String(r.summary||r.description||r.file_url||'')}</p><span>{String(r.published_at||r.event_date||r.created_at||'')}</span></div><div className="cms-row-actions"><button className="edit-icon" aria-label="Edit" onClick={()=>setEditing(r)}><Edit3/></button><button className="danger-icon" aria-label="Delete" onClick={()=>onDelete(kind,r.id)}><Trash2/></button></div></article>)}</div></div>
+function CmsManager({
+  kind,
+  rows,
+  busy,
+  onSave,
+  onDelete,
+  adminKey
+}: {
+  kind: 'news'|'events'|'media'
+  rows: CmsRow[]
+  busy: boolean
+  onSave: (
+    kind: 'news'|'events'|'media',
+    e: React.FormEvent<HTMLFormElement>,
+    id?: string
+  ) => void
+  onDelete: (kind: 'news'|'events'|'media', id: string) => void
+  adminKey: string
+}) {
+  const [editing, setEditing] = React.useState<CmsRow|null>(null)
+
+  React.useEffect(() => setEditing(null), [kind])
+
+  return (
+    <div className="cms-manager">
+      <form
+        key={editing?.id || `new-${kind}`}
+        className="cms-create"
+        onSubmit={e => {
+          onSave(kind, e, editing?.id)
+          setEditing(null)
+        }}
+      >
+        <div className="cms-create-title">
+          <Plus/>
+          <div>
+            <h2>
+              {editing ? 'Edit' : 'Create'}{' '}
+              {kind === 'news'
+                ? 'news post'
+                : kind === 'events'
+                ? 'event'
+                : 'media item'}
+            </h2>
+            <p>Saved directly to Supabase.</p>
+          </div>
+        </div>
+
+        {kind === 'news' && (
+          <>
+            <label>
+              Title
+              <input name="title" required defaultValue={editing?.title || ''}/>
+            </label>
+            <label>
+              Slug
+              <input
+                name="slug"
+                placeholder="e.g. makueni-community-listening"
+                defaultValue={editing?.slug || ''}
+              />
+            </label>
+            <label>
+              Category
+              <input
+                name="category"
+                placeholder="Campaign Update"
+                defaultValue={editing?.category || ''}
+              />
+            </label>
+            <label>
+              Summary
+              <textarea name="summary" rows={3} defaultValue={editing?.summary || ''}/>
+            </label>
+            <label>
+              Full article
+              <textarea name="body" rows={7} defaultValue={editing?.body || ''}/>
+            </label>
+            <AdminUploadField
+              name="image_url"
+              label="Article cover image"
+              defaultValue={String(editing?.image_url || '')}
+              adminKey={adminKey}
+            />
+            <label className="cms-check">
+              <input
+                type="checkbox"
+                name="published"
+                value="true"
+                defaultChecked={editing ? Boolean(editing.published) : true}
+              />
+              Publish this article
+            </label>
+            <input
+              type="hidden"
+              name="published_at"
+              value={String(editing?.published_at || new Date().toISOString())}
+            />
+          </>
+        )}
+
+        {kind === 'events' && (
+          <>
+            <label>
+              Event title
+              <input name="title" required defaultValue={editing?.title || ''}/>
+            </label>
+            <label>
+              Venue
+              <input name="venue" defaultValue={editing?.venue || ''}/>
+            </label>
+            <label>
+              Ward
+              <input name="ward" defaultValue={editing?.ward || ''}/>
+            </label>
+            <label>
+              Date and time
+              <input
+                name="event_date"
+                type="datetime-local"
+                defaultValue={
+                  editing?.event_date
+                    ? String(editing.event_date).slice(0,16)
+                    : ''
+                }
+              />
+            </label>
+            <label>
+              Description
+              <textarea name="description" rows={5} defaultValue={editing?.description || ''}/>
+            </label>
+            <AdminUploadField
+              name="image_url"
+              label="Event cover image"
+              defaultValue={String(editing?.image_url || '')}
+              adminKey={adminKey}
+            />
+            <label className="cms-check">
+              <input
+                type="checkbox"
+                name="published"
+                value="true"
+                defaultChecked={editing ? Boolean(editing.published) : true}
+              />
+              Publish this event
+            </label>
+          </>
+        )}
+
+        {kind === 'media' && (
+          <>
+            <label>
+              Title
+              <input name="title" required defaultValue={editing?.title || ''}/>
+            </label>
+            <label>
+              Type
+              <select name="asset_type" defaultValue={editing?.asset_type || 'photo'}>
+                <option value="photo">Photo</option>
+                <option value="video">Video</option>
+                <option value="document">Document</option>
+              </select>
+            </label>
+            <AdminUploadField
+              name="file_url"
+              label="Media file"
+              defaultValue={String(editing?.file_url || '')}
+              adminKey={adminKey}
+              accept="image/*,application/pdf"
+              required
+            />
+            <AdminUploadField
+              name="thumbnail_url"
+              label="Thumbnail / preview image"
+              defaultValue={String(editing?.thumbnail_url || '')}
+              adminKey={adminKey}
+            />
+            <label>
+              Description
+              <textarea name="description" rows={5} defaultValue={editing?.description || ''}/>
+            </label>
+            <label className="cms-check">
+              <input
+                type="checkbox"
+                name="published"
+                value="true"
+                defaultChecked={editing ? Boolean(editing.published) : true}
+              />
+              Publish this media item
+            </label>
+          </>
+        )}
+
+        <div className="cms-form-actions">
+          <button className="btn primary" disabled={busy}>
+            <Save/> {busy ? 'Saving…' : editing ? 'Save Changes' : 'Publish'}
+          </button>
+          {editing && (
+            <button
+              type="button"
+              className="cms-cancel"
+              onClick={() => setEditing(null)}
+            >
+              Cancel edit
+            </button>
+          )}
+        </div>
+      </form>
+
+      <div className="cms-records">
+        <div className="cms-records-head">
+          <h2>Existing {kind}</h2>
+          <span>{rows.length} records</span>
+        </div>
+
+        {rows.length === 0 ? (
+          <div className="empty-state">
+            <FileText/>
+            <h3>No records yet</h3>
+            <p>Create the first item using the form.</p>
+          </div>
+        ) : (
+          rows.map(r => (
+            <article key={r.id}>
+              <div>
+                <small>{String(r.category || r.asset_type || r.ward || kind)}</small>
+                <h3>{String(r.title || 'Untitled')}</h3>
+                <p>{String(r.summary || r.description || r.file_url || '')}</p>
+                <span>
+                  {r.published === false ? 'Draft • ' : 'Published • '}
+                  {String(r.published_at || r.event_date || r.created_at || '')}
+                </span>
+              </div>
+              <div className="cms-row-actions">
+                <button
+                  className="edit-icon"
+                  aria-label="Edit"
+                  onClick={() => setEditing(r)}
+                >
+                  <Edit3/>
+                </button>
+                <button
+                  className="danger-icon"
+                  aria-label="Delete"
+                  onClick={() => onDelete(kind, r.id)}
+                >
+                  <Trash2/>
+                </button>
+              </div>
+            </article>
+          ))
+        )}
+      </div>
+    </div>
+  )
 }
 
 function PublicApp() {
