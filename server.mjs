@@ -62,7 +62,7 @@ async function audit(action,entity_type,entity_id=null,details={}){const{error}=
 async function contentObject(){const{data,error}=await supabase.from('campaign_content').select('content_key,content_value');if(error)throw error;return Object.fromEntries((data||[]).map(r=>[r.content_key,r.content_value??'']))}
 function normalize(type,row){return{id:row.id,type,createdAt:row.created_at,status:row.status||'new',name:row.full_name||'',email:row.email||'',phone:row.phone||'',ward:row.ward||'',subCounty:row.sub_county||'',subject:row.subject||'',message:row.message||row.idea||'',interest:row.interest||'',category:row.category||''}}
 
-app.get('/api/health',async(_req,res)=>{const{error}=await supabase.from('campaign_content').select('id').limit(1);res.status(error?503:200).json({status:error?'error':'ok',service:'philip-kaloki-website-api',storage:'supabase-postgresql',phase:'phase-31'})})
+app.get('/api/health',async(_req,res)=>{const{error}=await supabase.from('campaign_content').select('id').limit(1);res.status(error?503:200).json({status:error?'error':'ok',service:'philip-kaloki-website-api',storage:'supabase-postgresql',phase:'phase-32'})})
 app.get('/api/content',async(_req,res)=>{try{res.setHeader('Cache-Control','public,max-age=60');res.json(await contentObject())}catch(e){console.error(e);res.status(500).json({error:'Unable to load content'})}})
 
 app.post('/api/submissions/:type',rateLimit(60_000,20),async(req,res)=>{
@@ -292,6 +292,57 @@ app.post('/api/chat/:id/messages',rateLimit(60_000,20),async(req,res)=>{
 
     res.status(201).json({ok:true,message:data})
   }catch(e){console.error('chat message',e);res.status(500).json({error:'Unable to send message.'})}
+})
+
+
+app.post('/api/admin/chat/from-submission',adminOnly,async(req,res)=>{
+  try{
+    const p=clean(req.body)
+    const name=String(p.name||'Website visitor').trim()
+    const phone=String(p.phone||'').trim()
+    const email=String(p.email||'').trim()
+    const subject=String(p.subject||p.type||'Website enquiry').trim()
+    const message=String(p.message||'').trim()
+    const submissionId=String(p.submission_id||'').trim()
+
+    if(!phone)return res.status(400).json({error:'This submission has no phone number, so a reply thread cannot be created.'})
+
+    let query=supabase.from('chat_threads').select('*').eq('visitor_phone',phone).eq('status','open').order('updated_at',{ascending:false}).limit(1)
+    const{data:existing,error:findError}=await query
+    if(findError)throw findError
+
+    let thread=Array.isArray(existing)&&existing.length?existing[0]:null
+
+    if(!thread){
+      const{data:newThread,error:createError}=await supabase.from('chat_threads').insert({
+        visitor_name:name,
+        visitor_phone:phone,
+        visitor_email:email||null,
+        status:'open',
+        unread_count:0
+      }).select('*').single()
+      if(createError)throw createError
+      thread=newThread
+    }
+
+    if(message){
+      const prefix=subject?`${subject}\n\n`:''
+      const{error:msgError}=await supabase.from('chat_messages').insert({
+        thread_id:thread.id,
+        sender:'visitor',
+        message:`${prefix}${message}`
+      })
+      if(msgError)throw msgError
+    }
+
+    await supabase.from('chat_threads').update({updated_at:new Date().toISOString()}).eq('id',thread.id)
+    await audit('submission_chat_opened','chat_threads',thread.id,{submission_id:submissionId,type:p.type||''})
+
+    res.json({ok:true,thread_id:thread.id})
+  }catch(e){
+    console.error('submission to chat',e)
+    res.status(500).json({error:'Unable to open reply conversation.'})
+  }
 })
 
 app.get('/api/admin/chat/threads',adminOnly,async(_req,res)=>{

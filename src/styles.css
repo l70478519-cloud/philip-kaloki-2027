@@ -357,3 +357,47 @@ a[href^="tel:"],a[href^="mailto:"],a[href^="https://wa.me"]{touch-action:manipul
 @media(max-width:480px){
   .cms-stat-grid{grid-template-columns:1fr}
 }
+
+
+/* Phase 32 — reliable two-way messaging */
+.campaign-chat-launcher{
+  position:fixed!important;
+  right:22px!important;
+  bottom:22px!important;
+  z-index:9998!important;
+  min-width:64px!important;
+  width:auto!important;
+  height:58px!important;
+  padding:0 18px!important;
+  border:0!important;
+  border-radius:999px!important;
+  background:#149b5c!important;
+  color:#fff!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:8px!important;
+  cursor:pointer!important;
+  pointer-events:auto!important;
+  box-shadow:0 14px 36px rgba(0,0,0,.25)!important;
+}
+.campaign-chat-launcher span{font-weight:800}
+.campaign-chat-overlay{position:fixed;inset:0;z-index:9999;background:rgba(7,25,38,.28);display:flex;justify-content:flex-end;align-items:flex-end;padding:90px 22px 92px;pointer-events:auto}
+.campaign-chat-panel{position:relative!important;right:auto!important;bottom:auto!important;width:min(410px,calc(100vw - 28px))!important;height:min(620px,calc(100vh - 120px))!important;z-index:10000!important}
+.campaign-chat-foot{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-top:1px solid #e1e7e4;background:#fff}
+.campaign-chat-foot button{border:0;background:transparent;color:#556b78;cursor:pointer}
+.campaign-chat-foot a{color:#14945a;text-decoration:none;font-weight:800}
+
+.reply-submission{display:inline-flex!important;align-items:center;gap:6px;background:#0d8055!important;color:#fff!important;border-color:#0d8055!important}
+.reply-submission svg{width:15px;height:15px}
+.closed-chat-note{padding:10px 12px;background:#fff6dd;color:#755e19;font-size:12px}
+.chat-error.admin{margin:10px}
+.admin-chat-compose .btn.primary{min-height:44px}
+.admin-chat-manager button{cursor:pointer;pointer-events:auto}
+.thread-list>button{width:100%}
+
+@media(max-width:700px){
+  .campaign-chat-overlay{padding:70px 10px 82px}
+  .campaign-chat-panel{width:100%!important;height:min(650px,calc(100vh - 90px))!important}
+  .campaign-chat-launcher{right:14px!important;bottom:14px!important}
+}
