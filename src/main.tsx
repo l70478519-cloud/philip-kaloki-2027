@@ -534,6 +534,21 @@ function CampaignChatWidget({ content }: { content: Content }) {
   </>
 }
 
+
+function ViewerSocialDock({content}:{content:Content}){
+  const links=[
+    {label:'Facebook',url:content.facebook,icon:<FacebookIcon size={17}/>},
+    {label:'X',url:content.twitter,icon:<X size={17}/>},
+    {label:'Instagram',url:content.instagram,icon:<Instagram size={17}/>},
+    {label:'TikTok',url:content.tiktok,icon:<Music2 size={17}/>},
+    {label:'YouTube',url:content.youtube,icon:<Youtube size={17}/>}
+  ].filter(item=>validSocial(item.url))
+  if(!links.length)return null
+  return <aside className="viewer-social-dock" aria-label="Official social media">
+    {links.map(item=><a key={item.label} href={normalizeExternalUrl(item.url)} target="_blank" rel="noreferrer" title={item.label}>{item.icon}</a>)}
+  </aside>
+}
+
 function Layout({ children, content }: { children: React.ReactNode; content: Content }) {
   const [open, setOpen] = React.useState(false)
   const [showTop, setShowTop] = React.useState(false)
@@ -549,6 +564,7 @@ function Layout({ children, content }: { children: React.ReactNode; content: Con
     </div></header>
     <main id="main-content">{children}</main>
     
+    <ViewerSocialDock content={content}/><CampaignChatWidget content={content}/>
     {showTop && <button className="back-top" onClick={() => window.scrollTo({top:0,behavior:'smooth'})}><ChevronUp/></button>}
     <footer><div className="container footer-main">
       <div><div className="brand footer-brand"><span className="brand-mark">PK</span><span><strong>{content.candidateName.toUpperCase()}</strong><small>{content.campaignTitle.toUpperCase()}</small></span></div><p>{content.tagline} for every household.</p></div>
@@ -1668,23 +1684,7 @@ function AdminPage({ content, setContent }: { content: Content; setContent: Reac
     {label:'Media',value:stats.media_assets||0,icon:<ImageIcon/>,tab:'media' as AdminTab}
   ]
 
-  React.useEffect(()=>{
-    const source=new EventSource('/api/admin/chat/stream')
-    source.onmessage=(event)=>{
-      try{
-        const payload=JSON.parse(event.data)
-        if(payload.type==='thread'){
-          fetch('/api/admin/chat/threads',{headers:{'x-admin-key':key}})
-            .then(r=>r.ok?r.json():[])
-            .then(rows=>setChatUnread((Array.isArray(rows)?rows:[]).reduce((sum:number,row:any)=>sum+(Number(row.unread_count)||0),0)))
-            .catch(()=>{})
-        }
-      }catch{}
-    }
-    return()=>source.close()
-  },[key])
-
-  return <section className="admin-shell cms-v17"><aside className="admin-sidebar"><div className="brand"><span className="brand-mark">PK</span><span><strong>CAMPAIGN CMS</strong><small>SUPABASE • PHASE 33</small></span></div>
+  return <section className="admin-shell cms-v17"><aside className="admin-sidebar"><div className="brand"><span className="brand-mark">PK</span><span><strong>CAMPAIGN CMS</strong><small>SUPABASE • PHASE 34.1</small></span></div>
     <button type="button" className={tab==='dashboard'?'active':''} onClick={()=>changeTab('dashboard')}><LayoutDashboard/> Dashboard</button>
     <button type="button" className={tab==='inbox'?'active':''} onClick={()=>changeTab('inbox')}><Inbox/> Submissions</button>
     <button type="button" className={tab==='messages'?'active':''} onClick={()=>changeTab('messages')}><MessageCircle/> Messages</button>

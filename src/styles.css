@@ -481,3 +481,60 @@ a[href^="tel:"],a[href^="mailto:"],a[href^="https://wa.me"]{touch-action:manipul
   .reports-head{align-items:flex-start;flex-direction:column}.report-grid{grid-template-columns:1fr}.report-stat-grid{grid-template-columns:repeat(2,1fr)}
   .official-link-grid{grid-template-columns:1fr}
 }
+
+
+/* Phase 34.1 runtime + viewer hotfix */
+.viewer-social-dock{
+  position:fixed;
+  right:18px;
+  top:46%;
+  transform:translateY(-50%);
+  z-index:9200;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  padding:8px;
+  border-radius:999px;
+  background:rgba(8,39,62,.94);
+  box-shadow:0 12px 32px rgba(0,0,0,.2);
+}
+.viewer-social-dock a{
+  width:38px;
+  height:38px;
+  display:grid;
+  place-items:center;
+  border-radius:999px;
+  color:#fff;
+  text-decoration:none;
+  background:rgba(255,255,255,.09);
+  transition:transform .18s ease,background .18s ease,box-shadow .18s ease;
+}
+.viewer-social-dock a:hover{
+  transform:scale(1.08);
+  background:#14945a;
+  box-shadow:0 0 0 6px rgba(20,148,90,.15);
+}
+
+.campaign-chat-launcher{
+  display:flex!important;
+  visibility:visible!important;
+  opacity:1!important;
+  pointer-events:auto!important;
+  z-index:9300!important;
+}
+
+.campaign-chat-overlay,.campaign-chat-panel{
+  pointer-events:auto!important;
+}
+
+@media(max-width:700px){
+  .viewer-social-dock{
+    top:auto;
+    right:auto;
+    left:12px;
+    bottom:80px;
+    transform:none;
+    flex-direction:row;
+  }
+  .viewer-social-dock a{width:34px;height:34px}
+}
