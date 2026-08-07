@@ -535,19 +535,6 @@ function CampaignChatWidget({ content }: { content: Content }) {
 }
 
 
-function ViewerSocialDock({content}:{content:Content}){
-  const links=[
-    {label:'Facebook',url:content.facebook,icon:<FacebookIcon size={17}/>},
-    {label:'X',url:content.twitter,icon:<X size={17}/>},
-    {label:'Instagram',url:content.instagram,icon:<Instagram size={17}/>},
-    {label:'TikTok',url:content.tiktok,icon:<Music2 size={17}/>},
-    {label:'YouTube',url:content.youtube,icon:<Youtube size={17}/>}
-  ].filter(item=>validSocial(item.url))
-  if(!links.length)return null
-  return <aside className="viewer-social-dock" aria-label="Official social media">
-    {links.map(item=><a key={item.label} href={normalizeExternalUrl(item.url)} target="_blank" rel="noreferrer" title={item.label}>{item.icon}</a>)}
-  </aside>
-}
 
 function Layout({ children, content }: { children: React.ReactNode; content: Content }) {
   const [open, setOpen] = React.useState(false)
@@ -564,7 +551,7 @@ function Layout({ children, content }: { children: React.ReactNode; content: Con
     </div></header>
     <main id="main-content">{children}</main>
     
-    <ViewerSocialDock content={content}/><CampaignChatWidget content={content}/>
+    <CampaignChatWidget content={content}/>
     {showTop && <button className="back-top" onClick={() => window.scrollTo({top:0,behavior:'smooth'})}><ChevronUp/></button>}
     <footer><div className="container footer-main">
       <div><div className="brand footer-brand"><span className="brand-mark">PK</span><span><strong>{content.candidateName.toUpperCase()}</strong><small>{content.campaignTitle.toUpperCase()}</small></span></div><p>{content.tagline} for every household.</p></div>
