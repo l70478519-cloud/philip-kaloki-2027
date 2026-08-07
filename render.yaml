@@ -2,12 +2,16 @@ services:
   - type: web
     name: philip-kaloki-2027
     runtime: node
-    plan: free
-    buildCommand: npm ci && npm run build
-    startCommand: npm start
-    healthCheckPath: /api/health
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm run api
     envVars:
+      - key: NODE_VERSION
+        value: 22
       - key: NODE_ENV
         value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
       - key: ADMIN_KEY
         sync: false

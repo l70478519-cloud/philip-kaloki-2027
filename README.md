@@ -1,5 +1,5 @@
-# Prof. Philip Kaloki — Makueni County 2027
+# Philip Kaloki 2027 Website — Phase 17
 
-Combined professional campaign website through Phase 16.
+Professional React/TypeScript campaign website with Express, Supabase PostgreSQL, Render deployment, and a private Admin CMS.
 
-Run `npm install && npm run check` before starting development. Use `npm run api` and `npm run dev` in separate terminals in Codespaces. The next step is migrating content and submissions from JSON files to Supabase PostgreSQL.
+See `PHASE17_ADMIN_CMS_INSTALL.md` for installation and `supabase/phase17_cms.sql` for the database migration.

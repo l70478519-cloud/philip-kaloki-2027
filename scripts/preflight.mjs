@@ -1,8 +1,7 @@
 import fs from 'node:fs'
-const required=['src/main.tsx','src/styles.css','server.mjs','public/robots.txt','public/sitemap.xml','public/assets/philip-kaloki-portrait-hero.webp','data/content.json']
-let ok=true
-for(const file of required){if(!fs.existsSync(file)){console.error(`Missing: ${file}`);ok=false}else console.log(`✓ ${file}`)}
-const css=fs.readFileSync('src/styles.css','utf8')
-if(css.includes('\\n')){console.error('styles.css contains literal \\n characters');ok=false}else console.log('✓ CSS newline check')
-if(!ok)process.exit(1)
-console.log('Preflight passed.')
+const required=['src/main.tsx','src/styles.css','src/vite-env.d.ts','server.mjs','vite.config.ts','public/robots.txt','public/sitemap.xml','public/assets/philip-kaloki-portrait-hero.webp','supabase/phase17_cms.sql']
+let failed=false
+for(const f of required){if(fs.existsSync(f))console.log(`✓ ${f}`);else{console.error(`✗ missing ${f}`);failed=true}}
+const css=fs.readFileSync('src/styles.css','utf8');if(css.includes('\\n')){console.error('✗ literal \\n found in CSS');failed=true}else console.log('✓ CSS newline check')
+const main=fs.readFileSync('src/main.tsx','utf8');if(!main.includes('...fallbackContent,...data'))console.warn('! fallback content merge marker not found')
+if(failed)process.exit(1);console.log('Preflight passed.')
