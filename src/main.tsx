@@ -327,8 +327,8 @@ function CandidateReminder({ content }: { content: Content }) {
   return <aside className="candidate-reminder">
     <img src={content.candidateCardImage || fallbackContent.candidateCardImage} alt={content.candidateName}/>
     <div className="candidate-reminder-copy">
-      <small>VYING FOR</small>
-      <strong>GOVERNOR</strong>
+      <small>PHILIP KALOKI</small>
+      <strong>GOVERNOR CANDIDATE</strong>
       <span>Makueni County • 2027</span>
       <p>{content.strapline}</p>
       <a href="/agenda">View the development agenda <ArrowRight size={15}/></a>
@@ -758,11 +758,13 @@ function GallerySlideshow({items}:{items:any[]}) {
 function AlbumViewer({
   items,
   title,
-  description
+  description,
+  content
 }: {
   items: any[]
   title: string
   description?: string
+  content?: Content
 }) {
   const [open,setOpen]=React.useState(false)
   const [active,setActive]=React.useState(0)
@@ -812,6 +814,7 @@ function AlbumViewer({
           <small>{active+1} of {items.length}</small>
         </figcaption>
       </figure>
+      {content&&<div className="album-lightbox-reminder"><CandidateReminder content={content}/></div>}
       <button type="button" className="album-next" onClick={()=>setActive(v=>(v+1)%items.length)} aria-label="Next photograph">›</button>
       <div className="album-filmstrip">
         {items.map((item,index)=><button type="button" key={`${item.source}-${item.id}-${index}`} className={index===active?'active':''} onClick={()=>setActive(index)} aria-label={`View photograph ${index+1}`}>
@@ -831,7 +834,10 @@ function MediaPage({ content }: { content: Content }) {
   const albums=React.useMemo(()=>{
     const groups=new Map<string,any[]>()
     for(const photo of photos){
-      const name=String(photo.album_name||photo.album_title||(photo.source==='event'?'Campaign events':'Campaign moments')).trim()||'Campaign moments'
+      const rawAlbum=String(photo.album_name||photo.album_title||'').trim()
+      const realTitle=String(photo.title||photo.caption||'').replace(/\s*[.\-–—]?\s*\d+\s*$/,'').trim()
+      const generic=!rawAlbum||['Campaign moments','Campaign events','Campaign photograph','Campaign photographs'].includes(rawAlbum)
+      const name=(generic&&realTitle?realTitle:rawAlbum)||(photo.source==='event'?'Campaign events':'Campaign photographs')
       if(!groups.has(name))groups.set(name,[])
       groups.get(name)!.push(photo)
     }
@@ -842,9 +848,9 @@ function MediaPage({ content }: { content: Content }) {
   return <main className="inner-page">
     <section className="page-hero compact"><div className="container"><span className="section-kicker">Media Centre</span><h1>Campaign Media</h1><p>Official photographs, campaign resources and public communications from {content.candidateName}.</p></div></section>
     <section className="section album-section"><div className="container">
-      <div className="section-heading"><span className="section-kicker">PHOTO ALBUMS</span><h2>Campaign photograph albums</h2><p>Photographs are organised into albums so the library can grow without becoming difficult to browse.</p></div>
+      <div className="section-heading"><span className="section-kicker">PHOTO ALBUMS</span><h2>Campaign photograph albums</h2></div>
       <label className="album-search"><span>Search albums and photographs</span><div><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search event, ward, caption or album…"/></div></label>
-      {loading?<div className="public-empty">Loading campaign albums…</div>:albums.length===0?<div className="public-empty"><ImageIcon/><h3>No matching photographs</h3><p>Try another search term.</p></div>:<div className="album-grid multi-album-grid">{albums.map(album=><AlbumViewer key={album.title} items={album.items} title={album.title} description={`${album.items.length} campaign photograph${album.items.length===1?'':'s'}`}/>)}</div>}
+      {loading?<div className="public-empty">Loading campaign albums…</div>:albums.length===0?<div className="public-empty"><ImageIcon/><h3>No matching photographs</h3><p>Try another search term.</p></div>:<div className="album-grid multi-album-grid">{albums.map(album=><AlbumViewer key={album.title} items={album.items} title={album.title} description={`${album.items.length} campaign photograph${album.items.length===1?'':'s'}`} content={content}/>)}</div>}
       <div className="album-candidate-banner"><CandidateReminder content={content}/><p>Learn more about Prof. Philip Kaloki’s 2027 Makueni County gubernatorial campaign and development agenda while browsing the campaign archive.</p></div>
     </div></section>
     {resources.length>0&&<section className="section resources-section"><div className="container"><div className="section-heading"><span className="section-kicker">RESOURCES</span><h2>Videos & documents</h2></div><div className="media-resource-grid">{resources.map(item=><article key={item.id}><FileText/><div><strong>{item.title||'Campaign resource'}</strong>{item.description&&<p>{item.description}</p>}<a href={item.file_url} target="_blank" rel="noreferrer">Open resource →</a></div></article>)}</div></div></section>}
@@ -1666,7 +1672,7 @@ function AdminPage({ content, setContent }: { content: Content; setContent: Reac
     {label:'Media',value:stats.media_assets||0,icon:<ImageIcon/>,tab:'media' as AdminTab}
   ]
 
-  return <section className="admin-shell cms-v17"><aside className="admin-sidebar"><div className="brand"><span className="brand-mark">PK</span><span><strong>CAMPAIGN CMS</strong><small>SUPABASE • PHASE 34.1</small></span></div>
+  return <section className="admin-shell cms-v17"><aside className="admin-sidebar"><div className="brand"><span className="brand-mark">PK</span><span><strong>CAMPAIGN CMS</strong><small>SUPABASE • PHASE 35.1</small></span></div>
     <button type="button" className={tab==='dashboard'?'active':''} onClick={()=>changeTab('dashboard')}><LayoutDashboard/> Dashboard</button>
     <button type="button" className={tab==='inbox'?'active':''} onClick={()=>changeTab('inbox')}><Inbox/> Submissions</button>
     <button type="button" className={tab==='messages'?'active':''} onClick={()=>changeTab('messages')}><MessageCircle/> Messages</button>
@@ -1678,7 +1684,7 @@ function AdminPage({ content, setContent }: { content: Content; setContent: Reac
     <button type="button" className={tab==='social'?'active':''} onClick={()=>changeTab('social')}><Share2/> Social media</button>
     <button type="button" className={tab==='reports'?'active':''} onClick={()=>changeTab('reports')}><BarChart3/> Reports & analysis</button><button type="button" className={tab==='audit'?'active':''} onClick={()=>changeTab('audit')}><Activity/> Audit log</button>
     <a href="/"><Eye/> View website</a><button type="button" onClick={()=>{sessionStorage.removeItem('pk-admin-key');location.reload()}}><LogOut/> Sign out</button></aside>
-    <div className="admin-main"><div className="admin-top"><div><span>CAMPAIGN SECRETARIAT</span><h1>{title}</h1></div><button type="button" className="admin-refresh" onClick={()=>changeTab(tab)}><RefreshCw/> Refresh</button></div>{message&&<div className="admin-message">{message}</div>}
+    <div className="admin-main"><div className="admin-top"><div><span>CAMPAIGN SECRETARIAT</span><h1>{title}</h1></div><button type="button" className="admin-refresh" onClick={()=>window.location.reload()}><RefreshCw/> Refresh</button></div>{message&&<div className="admin-message">{message}</div>}
     {tab==='dashboard'&&<><div className="cms-stat-grid">{statCards.map(card=><button type="button" className="dashboard-stat" key={card.label} onClick={()=>changeTab(card.tab)}><span>{card.icon}</span><strong>{String(card.value)}</strong><small>{card.label}</small></button>)}</div><div className="cms-welcome"><Database/><div><h2>Supabase CMS connected</h2><p>Website content, enquiries, volunteer records, news, events, media records and audit activity are managed from one production database.</p></div></div></>}
     {tab==='messages'&&<AdminMessagesManager adminKey={key}/>}
         {tab==='inbox'&&<div className="submission-list">{rows.length===0?<div className="empty-state"><Inbox/><h3>No submissions yet</h3><p>Website submissions will appear here.</p></div>:rows.map(r=><article key={r.id}><div className="submission-head"><span className={`status ${r.status}`}>{r.status==='new'?<Clock3/>:<Check/>}{r.status}</span><strong>{(r.type||'submission').toUpperCase()}</strong><small>{new Date(r.createdAt).toLocaleString()}</small></div><h3>{r.name||r.email||'Website submission'}</h3><p>{r.message||r.subject||r.interest||'Newsletter subscription'}</p><div className="submission-meta">{Object.entries(r).filter(([k])=>!['id','type','createdAt','status','message'].includes(k)).slice(0,7).map(([k,v])=><span key={k}><b>{k}:</b> {String(v||'—')}</span>)}</div><div className="cms-actions"><button onClick={()=>changeStatus(r,'reviewed')}>Reviewed</button><button type="button" className="reply-submission" onClick={()=>replyToSubmission(r)}><MessageCircle/> Reply</button><button onClick={()=>changeStatus(r,'closed')}>Close</button></div></article>)}</div>}
@@ -1796,6 +1802,7 @@ function MediaBatchUploader({adminKey,onDone}:{adminKey:string;onDone?:()=>void}
             file_url:url,
             thumbnail_url:url,
             description:description.trim(),
+            album_name:base,
             published:true
           })
         })
@@ -1897,6 +1904,25 @@ function CmsManager({
   const [editing, setEditing] = React.useState<CmsRow|null>(null)
 
   React.useEffect(() => setEditing(null), [kind])
+
+  const mediaGroups=React.useMemo(()=>{
+    if(kind!=='media')return [] as {title:string;items:CmsRow[]}[]
+    const groups=new Map<string,CmsRow[]>()
+    for(const row of rows){
+      const raw=String(row.album_name||'').trim()
+      const inferred=String(row.title||'').replace(/\s*[.\-–—]?\s*\d+\s*$/,'').trim()
+      const generic=!raw||['Campaign moments','Campaign events','Campaign photograph','Campaign photographs'].includes(raw)
+      const album=(generic&&inferred?inferred:raw)||'Campaign photographs'
+      if(!groups.has(album))groups.set(album,[])
+      groups.get(album)!.push(row)
+    }
+    return Array.from(groups.entries()).map(([title,items])=>({title,items}))
+  },[kind,rows])
+
+  const renderRecord=(r:CmsRow)=><article key={r.id}>
+    <div><small>{String(r.category || r.asset_type || r.ward || kind)}</small><h3>{String(r.title || 'Untitled')}</h3><p>{String(r.summary || r.description || r.file_url || '')}</p><span>{r.published === false ? 'Draft • ' : 'Published • '}{String(r.published_at || r.event_date || r.created_at || '')}</span></div>
+    <div className="cms-row-actions"><button className="edit-icon" aria-label="Edit" onClick={()=>setEditing(r)}><Edit3/></button><button className="danger-icon" aria-label="Delete" onClick={()=>onDelete(kind,r.id)}><Trash2/></button></div>
+  </article>
 
   return (
     <div className="cms-manager">
@@ -2120,35 +2146,7 @@ function CmsManager({
             <p>Create the first item using the form.</p>
           </div>
         ) : (
-          rows.map(r => (
-            <article key={r.id}>
-              <div>
-                <small>{String(r.category || r.asset_type || r.ward || kind)}</small>
-                <h3>{String(r.title || 'Untitled')}</h3>
-                <p>{String(r.summary || r.description || r.file_url || '')}</p>
-                <span>
-                  {r.published === false ? 'Draft • ' : 'Published • '}
-                  {String(r.published_at || r.event_date || r.created_at || '')}
-                </span>
-              </div>
-              <div className="cms-row-actions">
-                <button
-                  className="edit-icon"
-                  aria-label="Edit"
-                  onClick={() => setEditing(r)}
-                >
-                  <Edit3/>
-                </button>
-                <button
-                  className="danger-icon"
-                  aria-label="Delete"
-                  onClick={() => onDelete(kind, r.id)}
-                >
-                  <Trash2/>
-                </button>
-              </div>
-            </article>
-          ))
+          kind==='media' ? <div className="admin-album-groups">{mediaGroups.map(group=><details className="admin-album-group" key={group.title}><summary><span><ImageIcon/><strong>{group.title}</strong></span><em>{group.items.length} photo{group.items.length===1?'':'s'}</em></summary><div className="admin-album-items">{group.items.map(renderRecord)}</div></details>)}</div> : rows.map(renderRecord)
         )}
       </div>
     </div>
