@@ -555,3 +555,99 @@ a[href^="tel:"],a[href^="mailto:"],a[href^="https://wa.me"]{touch-action:manipul
 .album-lightbox-reminder{position:absolute;left:50%;bottom:88px;transform:translateX(-50%);z-index:4;width:min(620px,calc(100% - 110px))}
 .album-lightbox-reminder .candidate-reminder{background:rgba(255,255,255,.95);backdrop-filter:blur(8px);box-shadow:0 10px 35px rgba(0,0,0,.25)}
 @media(max-width:700px){.album-lightbox-reminder{bottom:78px;width:calc(100% - 32px)}.album-lightbox-reminder .candidate-reminder p,.album-lightbox-reminder .candidate-reminder a{display:none}}
+
+
+/* Phase 35.2 — event albums, album editing, candidate identity */
+.candidate-identity-strip{
+  position:sticky;
+  top:0;
+  z-index:75;
+  background:rgba(8,45,69,.97);
+  color:#fff;
+  border-top:1px solid rgba(255,255,255,.07);
+  box-shadow:0 5px 15px rgba(10,37,55,.08);
+}
+.candidate-identity-inner{
+  min-height:36px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-size:12px;
+  white-space:nowrap;
+  overflow:hidden;
+}
+.candidate-identity-inner .identity-mark{
+  width:23px;
+  height:23px;
+  border:2px solid #e6b936;
+  border-radius:999px;
+  display:grid;
+  place-items:center;
+  font-family:Georgia,serif;
+  font-size:9px;
+  flex:0 0 auto;
+}
+.candidate-identity-inner strong{font-size:12px}
+.candidate-identity-inner>span:not(.identity-mark){opacity:.82;overflow:hidden;text-overflow:ellipsis}
+.candidate-identity-inner a{
+  margin-left:auto;
+  color:#f1c64a;
+  text-decoration:none;
+  font-weight:800;
+  display:flex;
+  align-items:center;
+  gap:4px;
+  flex:0 0 auto;
+}
+
+.event-album-section>.photo-album-card{margin-top:14px;max-width:760px}
+.event-album-admin{
+  border:1px solid #d9e4df;
+  border-radius:13px;
+  background:#f8fbf9;
+  overflow:hidden;
+  margin:14px 0;
+}
+.event-album-admin>summary{
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  padding:14px 16px;
+  list-style:none;
+  background:#f1f7f4;
+}
+.event-album-admin>summary::-webkit-details-marker{display:none}
+.event-album-admin>summary span{display:flex;align-items:center;gap:8px;color:#0b3553}
+.event-album-admin>summary em{font-style:normal;font-size:12px;color:#647781}
+.event-album-admin-body{padding:14px;display:grid;gap:12px}
+.save-complete-message{color:#0b8052;font-weight:800}
+.event-admin-photo-actions{display:flex;justify-content:center;gap:6px;padding:8px}
+
+.admin-album-toolbar{
+  display:flex;
+  justify-content:flex-end;
+  padding:10px 12px 0;
+}
+.admin-album-toolbar button{
+  border:1px solid #cfe0d8;
+  background:#edf7f2;
+  color:#0b7550;
+  min-height:36px;
+  padding:0 11px;
+  border-radius:8px;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  cursor:pointer;
+  font-weight:800;
+}
+.admin-album-toolbar button svg{width:15px;height:15px}
+
+@media(max-width:700px){
+  .candidate-identity-inner{min-height:34px;gap:7px}
+  .candidate-identity-inner>span:not(.identity-mark){display:none}
+  .candidate-identity-inner a{font-size:11px}
+  .event-album-admin>summary{align-items:flex-start;flex-direction:column}
+}

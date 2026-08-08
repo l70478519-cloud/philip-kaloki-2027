@@ -554,6 +554,18 @@ function ViewerSocialDock({content}:{content:Content}){
   </aside>
 }
 
+
+function CandidateIdentityStrip({content}:{content:Content}){
+  return <div className="candidate-identity-strip" role="note" aria-label="Candidate identification">
+    <div className="container candidate-identity-inner">
+      <span className="identity-mark">PK</span>
+      <strong>{content.candidateName}</strong>
+      <span>Candidate for Governor • Makueni County • 2027</span>
+      <a href="/agenda">Development agenda <ArrowRight size={13}/></a>
+    </div>
+  </div>
+}
+
 function Layout({ children, content }: { children: React.ReactNode; content: Content }) {
   const [open, setOpen] = React.useState(false)
   const [showTop, setShowTop] = React.useState(false)
@@ -567,6 +579,7 @@ function Layout({ children, content }: { children: React.ReactNode; content: Con
       <nav className={open ? 'nav-links open' : 'nav-links'}>{links.map(([href,label]) => <a key={href} href={href} onClick={()=>setOpen(false)}>{label}</a>)}<a href="/volunteer" className="nav-cta" onClick={()=>setOpen(false)}>Join the Movement</a></nav>
       <button className="menu" aria-label="Toggle navigation" onClick={() => setOpen(!open)}>{open ? <X/> : <Menu/>}</button>
     </div></header>
+    <CandidateIdentityStrip content={content}/>
     <main id="main-content">{children}</main>
     
     <CampaignChatWidget content={content}/>
@@ -692,18 +705,17 @@ function NewsDetailPage({ slug, content }: { slug: string; content: Content }) {
   ]).then(([data,imageData])=>{setPost(data);setImages(Array.isArray(imageData)?imageData:[]);if(data)setDetailMeta(data.title,data.summary||data.body||content.strapline,data.image_url)}).catch(()=>setPost(null)).finally(()=>setLoading(false))},[slug,content.strapline])
   if(loading)return <main className="inner-page"><section className="section"><div className="container"><div className="public-empty">Loading article…</div></div></section></main>
   if(!post)return <NotFoundPage/>
-  return <main className="inner-page"><section className="article-hero"><div className="container article-title-wrap"><div><span className="section-kicker">{post.category||'Campaign Update'}</span><h1>{post.title}</h1>{post.published_at&&<p className="article-meta">{new Date(post.published_at).toLocaleString()}</p>}</div><CandidateReminder content={content}/></div></section><article className="section"><div className="container detail-layout"><div className="article-wrap">{post.image_url&&<img className="article-cover" src={post.image_url} alt={post.title}/>} {post.summary&&<p className="article-summary">{post.summary}</p>}<div className="article-body">{(post.body||'').split('\n').map((p,i)=><p key={i}>{p}</p>)}</div>{images.length>0&&<section className="event-public-gallery"><div className="section-kicker">NEWS PHOTO GALLERY</div><h2>More from this story</h2><div className="event-mini-gallery">{images.map((img,index)=><button key={img.id} onClick={()=>setSelected(img)}><img src={img.image_url} alt={img.caption||`News photograph ${index+1}`} loading="lazy"/><span>{cleanPublicCaption(img.caption||`Photo ${index+1}`)}</span></button>)}</div></section>}{post.social_url&&<a className="social-read-more" href={post.social_url} target="_blank" rel="noreferrer"><ExternalLink/> Read more on the official social post</a>}{post.live_url&&<a className="live-now-link detail-live" href={post.live_url} target="_blank" rel="noreferrer"><PlayCircle/> Watch live / replay</a>}<div className="detail-share"><Share2/><span>Share this update through the campaign social channels.</span><SocialLinks content={content}/></div><a className="detail-link" href="/news">← Back to news</a></div><div className="detail-aside"><CandidateReminder content={content}/></div></div></article>{selected&&<div className="gallery-lightbox" role="dialog" aria-modal="true" onClick={()=>setSelected(null)}><button aria-label="Close gallery" onClick={()=>setSelected(null)}><X/></button><img src={selected.image_url} alt={selected.caption||'News photograph'}/>{selected.caption&&<p>{selected.caption}</p>}</div>}</main>
+  return <main className="inner-page"><section className="article-hero"><div className="container article-title-wrap"><div><span className="section-kicker">{post.category||'Campaign Update'}</span><h1>{post.title}</h1>{post.published_at&&<p className="article-meta">{new Date(post.published_at).toLocaleString()}</p>}</div><CandidateReminder content={content}/></div></section><article className="section"><div className="container detail-layout"><div className="article-wrap">{post.image_url&&<img className="article-cover" src={post.image_url} alt={post.title}/>} {post.summary&&<p className="article-summary">{post.summary}</p>}<div className="article-body">{(post.body||'').split('\n').map((p,i)=><p key={i}>{p}</p>)}</div>{images.length>0&&<section className="event-public-gallery event-album-section"><div className="section-kicker">EVENT PHOTO ALBUM</div><h2>{post.title}</h2><AlbumViewer items={images.map(img=>({...img,image_url:img.image_url,description:img.caption||''}))} title={post.title} description={`${images.length} photograph${images.length===1?'':'s'} from this event`} content={content}/></section>}{post.social_url&&<a className="social-read-more" href={post.social_url} target="_blank" rel="noreferrer"><ExternalLink/> Read more on the official social post</a>}{post.live_url&&<a className="live-now-link detail-live" href={post.live_url} target="_blank" rel="noreferrer"><PlayCircle/> Watch live / replay</a>}<div className="detail-share"><Share2/><span>Share this update through the campaign social channels.</span><SocialLinks content={content}/></div><a className="detail-link" href="/news">← Back to news</a></div><div className="detail-aside"><CandidateReminder content={content}/></div></div></article>{selected&&<div className="gallery-lightbox" role="dialog" aria-modal="true" onClick={()=>setSelected(null)}><button aria-label="Close gallery" onClick={()=>setSelected(null)}><X/></button><img src={selected.image_url} alt={selected.caption||'News photograph'}/>{selected.caption&&<p>{selected.caption}</p>}</div>}</main>
 }
 
 function EventDetailPage({ id, content }: { id: string; content: Content }) {
   const [event,setEvent]=React.useState<LiveEvent|null>(null)
   const [images,setImages]=React.useState<EventImage[]>([])
-  const [selected,setSelected]=React.useState<EventImage|null>(null)
   const [loading,setLoading]=React.useState(true)
   React.useEffect(()=>{Promise.all([fetch(`/api/events/${encodeURIComponent(id)}`).then(r=>r.ok?r.json():null),fetch(`/api/events/${encodeURIComponent(id)}/images`).then(r=>r.ok?r.json():[])]).then(([eventData,imageData])=>{setEvent(eventData);setImages(Array.isArray(imageData)?imageData:[]);if(eventData)setDetailMeta(eventData.title,eventData.description||content.strapline,eventData.image_url)}).catch(()=>setEvent(null)).finally(()=>setLoading(false))},[id,content.strapline])
   if(loading)return <main className="inner-page"><section className="section"><div className="container"><div className="public-empty">Loading event…</div></div></section></main>
   if(!event)return <NotFoundPage/>
-  return <main className="inner-page"><section className="article-hero"><div className="container article-title-wrap"><div><span className="section-kicker">Campaign Event</span><h1>{event.title}</h1>{event.event_date&&<p className="article-meta">{new Date(event.event_date).toLocaleString()}</p>}</div><CandidateReminder content={content}/></div></section><section className="section"><div className="container detail-layout"><div className="article-wrap">{event.image_url&&<img className="article-cover" src={event.image_url} alt={event.title}/>}<div className="event-detail-card"><strong>Location</strong><p>{[event.venue,event.ward].filter(Boolean).join(' • ')||'Venue to be announced'}</p></div><div className="article-body"><p>{event.description||''}</p></div>{event.social_url&&<a className="social-read-more" href={event.social_url} target="_blank" rel="noreferrer"><ExternalLink/> Read more on the official social post</a>}{event.live_url&&<a className="live-now-link detail-live" href={event.live_url} target="_blank" rel="noreferrer"><PlayCircle/> Watch live / replay</a>}{images.length>0&&<section className="event-public-gallery"><div className="section-kicker">EVENT PHOTO GALLERY</div><h2>Moments from this event</h2><div className="event-mini-gallery">{images.map((img,index)=><button key={img.id} onClick={()=>setSelected(img)}><img src={img.image_url} alt={img.caption||`Event photograph ${index+1}`} loading="lazy"/><span>{img.caption||`Photo ${index+1}`}</span></button>)}</div></section>}<a className="detail-link" href="/events">← Back to events</a></div><div className="detail-aside"><CandidateReminder content={content}/></div></div></section>{selected&&<div className="gallery-lightbox" role="dialog" aria-modal="true" onClick={()=>setSelected(null)}><button aria-label="Close gallery" onClick={()=>setSelected(null)}><X/></button><img src={selected.image_url} alt={selected.caption||'Event photograph'}/>{selected.caption&&<p>{selected.caption}</p>}</div>}</main>
+  return <main className="inner-page"><section className="article-hero"><div className="container article-title-wrap"><div><span className="section-kicker">Campaign Event</span><h1>{event.title}</h1>{event.event_date&&<p className="article-meta">{new Date(event.event_date).toLocaleString()}</p>}</div><CandidateReminder content={content}/></div></section><section className="section"><div className="container detail-layout"><div className="article-wrap">{event.image_url&&<img className="article-cover" src={event.image_url} alt={event.title}/>}<div className="event-detail-card"><strong>Location</strong><p>{[event.venue,event.ward].filter(Boolean).join(' • ')||'Venue to be announced'}</p></div><div className="article-body"><p>{event.description||''}</p></div>{event.social_url&&<a className="social-read-more" href={event.social_url} target="_blank" rel="noreferrer"><ExternalLink/> Read more on the official social post</a>}{event.live_url&&<a className="live-now-link detail-live" href={event.live_url} target="_blank" rel="noreferrer"><PlayCircle/> Watch live / replay</a>}{images.length>0&&<section className="event-public-gallery event-album-section"><div className="section-kicker">EVENT PHOTO ALBUM</div><h2>{event.title}</h2><AlbumViewer items={images.map(img=>({...img,image_url:img.image_url,description:img.caption||''}))} title={event.title} description={`${images.length} photograph${images.length===1?'':'s'} from this event`} content={content}/></section>}<a className="detail-link" href="/events">← Back to events</a></div><div className="detail-aside"><CandidateReminder content={content}/></div></div></section></main>
 }
 
 function EventsPage(){
@@ -837,7 +849,7 @@ function MediaPage({ content }: { content: Content }) {
       const rawAlbum=String(photo.album_name||photo.album_title||'').trim()
       const realTitle=String(photo.title||photo.caption||'').replace(/\s*[.\-–—]?\s*\d+\s*$/,'').trim()
       const generic=!rawAlbum||['Campaign moments','Campaign events','Campaign photograph','Campaign photographs'].includes(rawAlbum)
-      const name=(generic&&realTitle?realTitle:rawAlbum)||(photo.source==='event'?'Campaign events':'Campaign photographs')
+      const name=(generic&&realTitle?realTitle:rawAlbum)||(photo.source==='event'?'Event photographs':'Campaign photographs')
       if(!groups.has(name))groups.set(name,[])
       groups.get(name)!.push(photo)
     }
@@ -1672,7 +1684,7 @@ function AdminPage({ content, setContent }: { content: Content; setContent: Reac
     {label:'Media',value:stats.media_assets||0,icon:<ImageIcon/>,tab:'media' as AdminTab}
   ]
 
-  return <section className="admin-shell cms-v17"><aside className="admin-sidebar"><div className="brand"><span className="brand-mark">PK</span><span><strong>CAMPAIGN CMS</strong><small>SUPABASE • PHASE 35.1</small></span></div>
+  return <section className="admin-shell cms-v17"><aside className="admin-sidebar"><div className="brand"><span className="brand-mark">PK</span><span><strong>CAMPAIGN CMS</strong><small>SUPABASE • PHASE 35.2</small></span></div>
     <button type="button" className={tab==='dashboard'?'active':''} onClick={()=>changeTab('dashboard')}><LayoutDashboard/> Dashboard</button>
     <button type="button" className={tab==='inbox'?'active':''} onClick={()=>changeTab('inbox')}><Inbox/> Submissions</button>
     <button type="button" className={tab==='messages'?'active':''} onClick={()=>changeTab('messages')}><MessageCircle/> Messages</button>
@@ -1767,10 +1779,63 @@ function EventGalleryAdmin({ eventId, adminKey }: { eventId: string; adminKey: s
   const [caption,setCaption]=React.useState('')
   const load=async()=>{const r=await fetch(`/api/admin/events/${eventId}/images`,{headers:{'x-admin-key':adminKey}});if(r.ok)setImages(await r.json())}
   React.useEffect(()=>{load()},[eventId])
-  const upload=async(e:React.ChangeEvent<HTMLInputElement>)=>{const files=Array.from(e.target.files||[]);if(!files.length)return;if(!window.confirm(`Add ${files.length} selected photo${files.length===1?'':'s'} to this event gallery?`)){e.target.value='';return}setBusy(true);const body=new FormData();files.forEach(file=>body.append('files',file));body.append('caption',caption.trim());const r=await fetch(`/api/admin/events/${eventId}/images`,{method:'POST',headers:{'x-admin-key':adminKey},body});if(r.ok){await load();setMessage(`${files.length} event photo${files.length===1?'':'s'} uploaded.`)}else setMessage('Event gallery upload failed.');setBusy(false);e.target.value=''}
-  const remove=async(id:string)=>{await fetch(`/api/admin/event-images/${id}`,{method:'DELETE',headers:{'x-admin-key':adminKey}});await load()}
-  const reorder=async(index:number,direction:-1|1)=>{const target=index+direction;if(target<0||target>=images.length)return;const ordered=[...images];[ordered[index],ordered[target]]=[ordered[target],ordered[index]];const r=await fetch(`/api/admin/events/${eventId}/images/reorder`,{method:'POST',headers:{'Content-Type':'application/json','x-admin-key':adminKey},body:JSON.stringify({ids:ordered.map(i=>i.id)})});if(r.ok)await load()}
-  return <section className="event-gallery-admin"><div className="cms-create-title"><ImageIcon/><div><h3>Event mini gallery</h3><p>Upload unlimited event photographs in batches. Visitors see them on this event's public page.</p></div></div><div className="event-gallery-upload"><input type="file" accept="image/*" multiple onChange={upload} disabled={busy}/><span>{busy?'Uploading…':'Select multiple photographs'}</span></div>{message&&<small>{message}</small>}<div className="event-gallery-admin-grid">{images.map((img,index)=><article key={img.id}><img src={img.image_url} alt=""/><div><button type="button" onClick={()=>reorder(index,-1)} disabled={index===0}><ArrowUp/></button><button type="button" onClick={()=>reorder(index,1)} disabled={index===images.length-1}><ArrowDown/></button><button type="button" className="danger-icon" onClick={()=>remove(img.id)}><Trash2/></button></div></article>)}</div></section>
+
+  const upload=async(e:React.ChangeEvent<HTMLInputElement>)=>{
+    const files=Array.from(e.target.files||[])
+    if(!files.length)return
+    if(!window.confirm(`Add ${files.length} selected photo${files.length===1?'':'s'} to this event album?`)){e.target.value='';return}
+    setBusy(true)
+    const body=new FormData()
+    files.forEach(file=>body.append('files',file))
+    body.append('caption',caption.trim())
+    const r=await fetch(`/api/admin/events/${eventId}/images`,{method:'POST',headers:{'x-admin-key':adminKey},body})
+    if(r.ok){
+      await load()
+      setMessage(`${files.length} event photo${files.length===1?'':'s'} added to the album.`)
+      setCaption('')
+    }else setMessage('Event album upload failed.')
+    setBusy(false)
+    e.target.value=''
+  }
+
+  const remove=async(id:string)=>{
+    if(!confirm('Delete this photograph from the event album?'))return
+    await fetch(`/api/admin/event-images/${id}`,{method:'DELETE',headers:{'x-admin-key':adminKey}})
+    await load()
+  }
+
+  const reorder=async(index:number,direction:-1|1)=>{
+    const target=index+direction
+    if(target<0||target>=images.length)return
+    const ordered=[...images]
+    ;[ordered[index],ordered[target]]=[ordered[target],ordered[index]]
+    const r=await fetch(`/api/admin/events/${eventId}/images/reorder`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-admin-key':adminKey},
+      body:JSON.stringify({ids:ordered.map(i=>i.id)})
+    })
+    if(r.ok)await load()
+  }
+
+  return <details className="event-gallery-admin event-album-admin" open={images.length===0}>
+    <summary>
+      <span><ImageIcon/><strong>Event photo album</strong></span>
+      <em>{images.length} photograph{images.length===1?'':'s'} • Click to {images.length?'manage':'add photos'}</em>
+    </summary>
+    <div className="event-album-admin-body">
+      <label>Shared photo caption / context<input value={caption} onChange={e=>setCaption(e.target.value)} placeholder="e.g. Community consultation in Kilome"/></label>
+      <div className="event-gallery-upload"><input type="file" accept="image/*" multiple onChange={upload} disabled={busy}/><span>{busy?'Uploading…':'Choose multiple event photographs'}</span></div>
+      {message&&<small className="save-complete-message">{message}</small>}
+      {images.length>0&&<div className="event-gallery-admin-grid">{images.map((img,index)=><article key={img.id}>
+        <img src={img.image_url} alt={img.caption||`Event photo ${index+1}`}/>
+        <div className="event-admin-photo-actions">
+          <button type="button" onClick={()=>reorder(index,-1)} disabled={index===0}><ArrowUp/></button>
+          <button type="button" onClick={()=>reorder(index,1)} disabled={index===images.length-1}><ArrowDown/></button>
+          <button type="button" className="danger-icon" onClick={()=>remove(img.id)}><Trash2/></button>
+        </div>
+      </article>)}</div>}
+    </div>
+  </details>
 }
 
 
@@ -1918,6 +1983,32 @@ function CmsManager({
     }
     return Array.from(groups.entries()).map(([title,items])=>({title,items}))
   },[kind,rows])
+
+  const editMediaAlbum=async(group:{title:string;items:CmsRow[]})=>{
+    const nextTitle=window.prompt('Album title',group.title)
+    if(nextTitle===null)return
+    const cleanTitle=nextTitle.trim()
+    if(!cleanTitle){window.alert('Album title cannot be empty.');return}
+    const currentDescription=String(group.items.find(item=>item.description)?.description||'')
+    const nextDescription=window.prompt('Album description',currentDescription)
+    if(nextDescription===null)return
+    const r=await fetch('/api/admin/media/album-update',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-admin-key':adminKey},
+      body:JSON.stringify({
+        ids:group.items.map(item=>item.id),
+        album_name:cleanTitle,
+        description:nextDescription.trim()
+      })
+    })
+    if(r.ok){
+      window.alert('Album details updated.')
+      window.location.reload()
+    }else{
+      const data=await r.json().catch(()=>({}))
+      window.alert(data.error||'Unable to update album.')
+    }
+  }
 
   const renderRecord=(r:CmsRow)=><article key={r.id}>
     <div><small>{String(r.category || r.asset_type || r.ward || kind)}</small><h3>{String(r.title || 'Untitled')}</h3><p>{String(r.summary || r.description || r.file_url || '')}</p><span>{r.published === false ? 'Draft • ' : 'Published • '}{String(r.published_at || r.event_date || r.created_at || '')}</span></div>
@@ -2146,7 +2237,7 @@ function CmsManager({
             <p>Create the first item using the form.</p>
           </div>
         ) : (
-          kind==='media' ? <div className="admin-album-groups">{mediaGroups.map(group=><details className="admin-album-group" key={group.title}><summary><span><ImageIcon/><strong>{group.title}</strong></span><em>{group.items.length} photo{group.items.length===1?'':'s'}</em></summary><div className="admin-album-items">{group.items.map(renderRecord)}</div></details>)}</div> : rows.map(renderRecord)
+          kind==='media' ? <div className="admin-album-groups">{mediaGroups.map(group=><details className="admin-album-group" key={group.title}><summary><span><ImageIcon/><strong>{group.title}</strong></span><em>{group.items.length} photo{group.items.length===1?'':'s'} • Open album</em></summary><div className="admin-album-toolbar"><button type="button" onClick={()=>editMediaAlbum(group)}><Edit3/> Edit album title & description</button></div><div className="admin-album-items">{group.items.map(renderRecord)}</div></details>)}</div> : rows.map(renderRecord)
         )}
       </div>
     </div>

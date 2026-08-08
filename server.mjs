@@ -125,7 +125,7 @@ async function audit(action,entity_type,entity_id=null,details={}){const{error}=
 async function contentObject(){const{data,error}=await supabase.from('campaign_content').select('content_key,content_value');if(error)throw error;return Object.fromEntries((data||[]).map(r=>[r.content_key,r.content_value??'']))}
 function normalize(type,row){return{id:row.id,type,createdAt:row.created_at,status:row.status||'new',name:row.full_name||'',email:row.email||'',phone:row.phone||'',ward:row.ward||'',subCounty:row.sub_county||'',subject:row.subject||'',message:row.message||row.idea||'',interest:row.interest||'',category:row.category||''}}
 
-app.get('/api/health',async(_req,res)=>{const{error}=await supabase.from('campaign_content').select('id').limit(1);res.status(error?503:200).json({status:error?'error':'ok',service:'philip-kaloki-website-api',storage:'supabase-postgresql',phase:'phase-34'})})
+app.get('/api/health',async(_req,res)=>{const{error}=await supabase.from('campaign_content').select('id').limit(1);res.status(error?503:200).json({status:error?'error':'ok',service:'philip-kaloki-website-api',storage:'supabase-postgresql',phase:'phase-35.2'})})
 app.get('/api/content',async(_req,res)=>{try{res.setHeader('Cache-Control','public,max-age=60');res.json(await contentObject())}catch(e){console.error(e);res.status(500).json({error:'Unable to load content'})}})
 
 app.post('/api/submissions/:type',rateLimit(60_000,20),async(req,res)=>{
@@ -255,6 +255,28 @@ app.post('/api/submissions/:type',rateLimit(60_000,20),async(req,res)=>{
   }
 })
 
+
+
+app.post('/api/admin/media/album-update',adminOnly,async(req,res)=>{
+  try{
+    const ids=Array.isArray(req.body?.ids)?req.body.ids.filter(Boolean):[]
+    const album_name=String(req.body?.album_name||'').trim()
+    const description=String(req.body?.description||'').trim()
+    if(!ids.length)return res.status(400).json({error:'No album photographs selected.'})
+    if(!album_name)return res.status(400).json({error:'Album title is required.'})
+    const{error}=await supabase.from('media_assets').update({
+      album_name,
+      description,
+      updated_at:new Date().toISOString()
+    }).in('id',ids)
+    if(error)throw error
+    await audit('media_album_updated','media_assets',null,{count:ids.length,album_name})
+    res.json({ok:true,count:ids.length,album_name})
+  }catch(error){
+    console.error('media album update',error)
+    res.status(500).json({error:'Unable to update album details.'})
+  }
+})
 
 app.post('/api/admin/media/bulk-delete',adminOnly,async(req,res)=>{
   try{

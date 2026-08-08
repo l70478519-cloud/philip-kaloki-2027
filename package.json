@@ -1,7 +1,7 @@
 {
   "name": "philip-kaloki-2027",
   "private": true,
-  "version": "35.0.0",
+  "version": "35.2.0",
   "type": "module",
   "engines": {
     "node": "22.x",
