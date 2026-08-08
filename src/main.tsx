@@ -1,6 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import {ArrowRight, CalendarDays, CheckCircle2, ChevronUp, Droplets, HeartHandshake, Camera as Instagram, Landmark, Mail, MapPin, Menu, MessageCircle, Megaphone, Newspaper, Phone, PlayCircle, ShieldCheck, Sprout, Stethoscope, Target, FileText, Download, Users, X, PlayCircle as Youtube, BriefcaseBusiness, GraduationCap, LockKeyhole, LayoutDashboard, Inbox, Save, Home as HomeIcon, LogOut, Settings, Eye, Check, Clock3, ExternalLink, Image as ImageIcon, FileCheck2, BarChart3, Plus, Trash2, RefreshCw, Activity, Calendar, Database, Edit3, Music2, Share2, ArrowUp, ArrowDown, Bell, BellOff, Circle, Zap} from 'lucide-react'
+import {ArrowRight, CalendarDays, CheckCircle2, ChevronUp, Droplets, HeartHandshake, Camera as Instagram, Landmark, Mail, MapPin, Menu, MessageCircle, Megaphone, Newspaper, Phone, PlayCircle, ShieldCheck, Sprout, Stethoscope, Target, FileText, Download, Users, X, PlayCircle as Youtube, BriefcaseBusiness, GraduationCap, LockKeyhole, LayoutDashboard, Inbox, Save, Home as HomeIcon, LogOut, Settings, Eye, Check, Clock3, ExternalLink, Image as ImageIcon, FileCheck2, BarChart3, Plus, Trash2, RefreshCw, Activity, Calendar, Database, Edit3, Music2, Share2, ArrowUp, ArrowDown, Bell, BellOff, Circle, Zap, Search} from 'lucide-react'
 import './styles.css'
 
 function FacebookIcon({size=20}:{size?:number}) { return <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M13.5 22v-9h3l.45-3.5H13.5V7.26c0-1.01.28-1.7 1.73-1.7H17V2.43c-.31-.04-1.38-.13-2.62-.13-2.59 0-4.36 1.58-4.36 4.48V9.5H7v3.5h3.02v9h3.48z"/></svg> }
@@ -53,6 +53,8 @@ type LiveNewsPost = {
   published?: boolean
   published_at?: string
   created_at?: string
+  social_url?: string
+  live_url?: string
 }
 
 type LiveEvent = {
@@ -65,6 +67,8 @@ type LiveEvent = {
   image_url?: string
   published?: boolean
   created_at?: string
+  social_url?: string
+  live_url?: string
 }
 
 type LiveMediaAsset = {
@@ -76,6 +80,7 @@ type LiveMediaAsset = {
   thumbnail_url?: string
   published?: boolean
   created_at?: string
+  album_name?: string
 }
 
 
@@ -535,6 +540,19 @@ function CampaignChatWidget({ content }: { content: Content }) {
 }
 
 
+function ViewerSocialDock({content}:{content:Content}){
+  const links=[
+    {label:'Facebook',url:content.facebook,icon:<FacebookIcon size={17}/>},
+    {label:'X',url:content.twitter,icon:<X size={17}/>},
+    {label:'Instagram',url:content.instagram,icon:<Instagram size={17}/>},
+    {label:'TikTok',url:content.tiktok,icon:<Music2 size={17}/>},
+    {label:'YouTube',url:content.youtube,icon:<Youtube size={17}/>}
+  ].filter(item=>validSocial(item.url))
+  if(!links.length)return null
+  return <aside className="viewer-social-dock" aria-label="Official social media">
+    {links.map(item=><a key={item.label} href={normalizeExternalUrl(item.url)} target="_blank" rel="noreferrer" title={item.label}>{item.icon}</a>)}
+  </aside>
+}
 
 function Layout({ children, content }: { children: React.ReactNode; content: Content }) {
   const [open, setOpen] = React.useState(false)
@@ -651,7 +669,7 @@ function NewsPage(){
               <p>{post.summary || post.body || ''}</p>
               <div className="live-card-actions">
                 {post.published_at && <small>{new Date(post.published_at).toLocaleDateString()}</small>}
-                {post.slug && <a href={`/news/${post.slug}`}>Read full article →</a>}
+                {post.slug && <a href={`/news/${post.slug}`}>Read full article →</a>}{post.social_url&&<a href={post.social_url} target="_blank" rel="noreferrer">Read more on social media ↗</a>}{post.live_url&&<a className="live-now-link" href={post.live_url} target="_blank" rel="noreferrer">LIVE / Watch now ↗</a>}
               </div>
             </div>
           </article>)}
@@ -674,7 +692,7 @@ function NewsDetailPage({ slug, content }: { slug: string; content: Content }) {
   ]).then(([data,imageData])=>{setPost(data);setImages(Array.isArray(imageData)?imageData:[]);if(data)setDetailMeta(data.title,data.summary||data.body||content.strapline,data.image_url)}).catch(()=>setPost(null)).finally(()=>setLoading(false))},[slug,content.strapline])
   if(loading)return <main className="inner-page"><section className="section"><div className="container"><div className="public-empty">Loading article…</div></div></section></main>
   if(!post)return <NotFoundPage/>
-  return <main className="inner-page"><section className="article-hero"><div className="container article-title-wrap"><div><span className="section-kicker">{post.category||'Campaign Update'}</span><h1>{post.title}</h1>{post.published_at&&<p className="article-meta">{new Date(post.published_at).toLocaleString()}</p>}</div><CandidateReminder content={content}/></div></section><article className="section"><div className="container detail-layout"><div className="article-wrap">{post.image_url&&<img className="article-cover" src={post.image_url} alt={post.title}/>} {post.summary&&<p className="article-summary">{post.summary}</p>}<div className="article-body">{(post.body||'').split('\n').map((p,i)=><p key={i}>{p}</p>)}</div>{images.length>0&&<section className="event-public-gallery"><div className="section-kicker">NEWS PHOTO GALLERY</div><h2>More from this story</h2><div className="event-mini-gallery">{images.map((img,index)=><button key={img.id} onClick={()=>setSelected(img)}><img src={img.image_url} alt={img.caption||`News photograph ${index+1}`} loading="lazy"/><span>{cleanPublicCaption(img.caption||`Photo ${index+1}`)}</span></button>)}</div></section>}<div className="detail-share"><Share2/><span>Share this update through the campaign social channels.</span><SocialLinks content={content}/></div><a className="detail-link" href="/news">← Back to news</a></div><div className="detail-aside"><CandidateReminder content={content}/></div></div></article>{selected&&<div className="gallery-lightbox" role="dialog" aria-modal="true" onClick={()=>setSelected(null)}><button aria-label="Close gallery" onClick={()=>setSelected(null)}><X/></button><img src={selected.image_url} alt={selected.caption||'News photograph'}/>{selected.caption&&<p>{selected.caption}</p>}</div>}</main>
+  return <main className="inner-page"><section className="article-hero"><div className="container article-title-wrap"><div><span className="section-kicker">{post.category||'Campaign Update'}</span><h1>{post.title}</h1>{post.published_at&&<p className="article-meta">{new Date(post.published_at).toLocaleString()}</p>}</div><CandidateReminder content={content}/></div></section><article className="section"><div className="container detail-layout"><div className="article-wrap">{post.image_url&&<img className="article-cover" src={post.image_url} alt={post.title}/>} {post.summary&&<p className="article-summary">{post.summary}</p>}<div className="article-body">{(post.body||'').split('\n').map((p,i)=><p key={i}>{p}</p>)}</div>{images.length>0&&<section className="event-public-gallery"><div className="section-kicker">NEWS PHOTO GALLERY</div><h2>More from this story</h2><div className="event-mini-gallery">{images.map((img,index)=><button key={img.id} onClick={()=>setSelected(img)}><img src={img.image_url} alt={img.caption||`News photograph ${index+1}`} loading="lazy"/><span>{cleanPublicCaption(img.caption||`Photo ${index+1}`)}</span></button>)}</div></section>}{post.social_url&&<a className="social-read-more" href={post.social_url} target="_blank" rel="noreferrer"><ExternalLink/> Read more on the official social post</a>}{post.live_url&&<a className="live-now-link detail-live" href={post.live_url} target="_blank" rel="noreferrer"><PlayCircle/> Watch live / replay</a>}<div className="detail-share"><Share2/><span>Share this update through the campaign social channels.</span><SocialLinks content={content}/></div><a className="detail-link" href="/news">← Back to news</a></div><div className="detail-aside"><CandidateReminder content={content}/></div></div></article>{selected&&<div className="gallery-lightbox" role="dialog" aria-modal="true" onClick={()=>setSelected(null)}><button aria-label="Close gallery" onClick={()=>setSelected(null)}><X/></button><img src={selected.image_url} alt={selected.caption||'News photograph'}/>{selected.caption&&<p>{selected.caption}</p>}</div>}</main>
 }
 
 function EventDetailPage({ id, content }: { id: string; content: Content }) {
@@ -685,7 +703,7 @@ function EventDetailPage({ id, content }: { id: string; content: Content }) {
   React.useEffect(()=>{Promise.all([fetch(`/api/events/${encodeURIComponent(id)}`).then(r=>r.ok?r.json():null),fetch(`/api/events/${encodeURIComponent(id)}/images`).then(r=>r.ok?r.json():[])]).then(([eventData,imageData])=>{setEvent(eventData);setImages(Array.isArray(imageData)?imageData:[]);if(eventData)setDetailMeta(eventData.title,eventData.description||content.strapline,eventData.image_url)}).catch(()=>setEvent(null)).finally(()=>setLoading(false))},[id,content.strapline])
   if(loading)return <main className="inner-page"><section className="section"><div className="container"><div className="public-empty">Loading event…</div></div></section></main>
   if(!event)return <NotFoundPage/>
-  return <main className="inner-page"><section className="article-hero"><div className="container article-title-wrap"><div><span className="section-kicker">Campaign Event</span><h1>{event.title}</h1>{event.event_date&&<p className="article-meta">{new Date(event.event_date).toLocaleString()}</p>}</div><CandidateReminder content={content}/></div></section><section className="section"><div className="container detail-layout"><div className="article-wrap">{event.image_url&&<img className="article-cover" src={event.image_url} alt={event.title}/>}<div className="event-detail-card"><strong>Location</strong><p>{[event.venue,event.ward].filter(Boolean).join(' • ')||'Venue to be announced'}</p></div><div className="article-body"><p>{event.description||''}</p></div>{images.length>0&&<section className="event-public-gallery"><div className="section-kicker">EVENT PHOTO GALLERY</div><h2>Moments from this event</h2><div className="event-mini-gallery">{images.map((img,index)=><button key={img.id} onClick={()=>setSelected(img)}><img src={img.image_url} alt={img.caption||`Event photograph ${index+1}`} loading="lazy"/><span>{img.caption||`Photo ${index+1}`}</span></button>)}</div></section>}<a className="detail-link" href="/events">← Back to events</a></div><div className="detail-aside"><CandidateReminder content={content}/></div></div></section>{selected&&<div className="gallery-lightbox" role="dialog" aria-modal="true" onClick={()=>setSelected(null)}><button aria-label="Close gallery" onClick={()=>setSelected(null)}><X/></button><img src={selected.image_url} alt={selected.caption||'Event photograph'}/>{selected.caption&&<p>{selected.caption}</p>}</div>}</main>
+  return <main className="inner-page"><section className="article-hero"><div className="container article-title-wrap"><div><span className="section-kicker">Campaign Event</span><h1>{event.title}</h1>{event.event_date&&<p className="article-meta">{new Date(event.event_date).toLocaleString()}</p>}</div><CandidateReminder content={content}/></div></section><section className="section"><div className="container detail-layout"><div className="article-wrap">{event.image_url&&<img className="article-cover" src={event.image_url} alt={event.title}/>}<div className="event-detail-card"><strong>Location</strong><p>{[event.venue,event.ward].filter(Boolean).join(' • ')||'Venue to be announced'}</p></div><div className="article-body"><p>{event.description||''}</p></div>{event.social_url&&<a className="social-read-more" href={event.social_url} target="_blank" rel="noreferrer"><ExternalLink/> Read more on the official social post</a>}{event.live_url&&<a className="live-now-link detail-live" href={event.live_url} target="_blank" rel="noreferrer"><PlayCircle/> Watch live / replay</a>}{images.length>0&&<section className="event-public-gallery"><div className="section-kicker">EVENT PHOTO GALLERY</div><h2>Moments from this event</h2><div className="event-mini-gallery">{images.map((img,index)=><button key={img.id} onClick={()=>setSelected(img)}><img src={img.image_url} alt={img.caption||`Event photograph ${index+1}`} loading="lazy"/><span>{img.caption||`Photo ${index+1}`}</span></button>)}</div></section>}<a className="detail-link" href="/events">← Back to events</a></div><div className="detail-aside"><CandidateReminder content={content}/></div></div></section>{selected&&<div className="gallery-lightbox" role="dialog" aria-modal="true" onClick={()=>setSelected(null)}><button aria-label="Close gallery" onClick={()=>setSelected(null)}><X/></button><img src={selected.image_url} alt={selected.caption||'Event photograph'}/>{selected.caption&&<p>{selected.caption}</p>}</div>}</main>
 }
 
 function EventsPage(){
@@ -705,7 +723,7 @@ function EventsPage(){
         <div className="live-events-grid">
           {events.map(event => <article className="live-event-card" key={event.id}>
             <div className="live-event-date">{event.event_date ? new Date(event.event_date).toLocaleDateString(undefined,{month:'short',day:'2-digit'}) : 'TBA'}</div>
-            <div><h3><a className="card-title-link" href={`/events/${event.id}`}>{event.title}</a></h3><p>{event.description || ''}</p><small>{[event.venue,event.ward].filter(Boolean).join(' • ')}</small><div><a className="detail-link" href={`/events/${event.id}`}>View event →</a></div></div>
+            <div><h3><a className="card-title-link" href={`/events/${event.id}`}>{event.title}</a></h3><p>{event.description || ''}</p><small>{[event.venue,event.ward].filter(Boolean).join(' • ')}</small><div className="live-card-actions"><a className="detail-link" href={`/events/${event.id}`}>View event →</a>{event.social_url&&<a href={event.social_url} target="_blank" rel="noreferrer">Read more on social media ↗</a>}{event.live_url&&<a className="live-now-link" href={event.live_url} target="_blank" rel="noreferrer">LIVE / Watch now ↗</a>}</div></div>
           </article>)}
         </div>}
       </div>
@@ -807,52 +825,29 @@ function AlbumViewer({
 function MediaPage({ content }: { content: Content }) {
   const { data: media, loading } = useLiveApi<LiveMediaAsset[]>('/api/media', [])
   const { data: gallery } = useLiveApi<any[]>('/api/media-gallery', [])
+  const [query,setQuery]=React.useState('')
   const photos=gallery.filter((item:any)=>usableMediaUrl(item.image_url))
   const resources=media.filter(item=>item.asset_type!=='photo' && usableMediaUrl(item.file_url))
+  const albums=React.useMemo(()=>{
+    const groups=new Map<string,any[]>()
+    for(const photo of photos){
+      const name=String(photo.album_name||photo.album_title||(photo.source==='event'?'Campaign events':'Campaign moments')).trim()||'Campaign moments'
+      if(!groups.has(name))groups.set(name,[])
+      groups.get(name)!.push(photo)
+    }
+    const q=query.trim().toLowerCase()
+    return Array.from(groups.entries()).map(([title,items])=>({title,items})).filter(album=>!q||album.title.toLowerCase().includes(q)||album.items.some((x:any)=>`${x.caption||''} ${x.description||''}`.toLowerCase().includes(q)))
+  },[photos,query])
 
   return <main className="inner-page">
-    <section className="page-hero compact">
-      <div className="container">
-        <span className="section-kicker">Media Centre</span>
-        <h1>Campaign Media</h1>
-        <p>Official photographs, campaign resources and public communications from {content.candidateName}.</p>
-      </div>
-    </section>
-
-    <section className="section album-section">
-      <div className="container">
-        <div className="section-heading">
-          <span className="section-kicker">PHOTO ALBUMS</span>
-          <h2>Campaign photographs</h2>
-          <p>Open the album and browse the photographs one by one using the arrows, keyboard keys, or thumbnail strip.</p>
-        </div>
-        {loading?<div className="public-empty">Loading campaign album…</div>:
-        photos.length===0?<div className="public-empty"><ImageIcon/><h3>No gallery photographs yet</h3></div>:
-        <div className="album-grid">
-          <AlbumViewer
-            items={photos}
-            title="Campaign moments"
-            description="Media Library and event photographs from campaign activities across Makueni."
-          />
-        </div>}
-      </div>
-    </section>
-
-    {resources.length>0&&<section className="section resources-section">
-      <div className="container">
-        <div className="section-heading"><span className="section-kicker">RESOURCES</span><h2>Videos & documents</h2></div>
-        <div className="media-resource-grid">
-          {resources.map(item=><article key={item.id}>
-            <FileText/>
-            <div>
-              <strong>{item.title||'Campaign resource'}</strong>
-              {item.description&&<p>{item.description}</p>}
-              <a href={item.file_url} target="_blank" rel="noreferrer">Open resource →</a>
-            </div>
-          </article>)}
-        </div>
-      </div>
-    </section>}
+    <section className="page-hero compact"><div className="container"><span className="section-kicker">Media Centre</span><h1>Campaign Media</h1><p>Official photographs, campaign resources and public communications from {content.candidateName}.</p></div></section>
+    <section className="section album-section"><div className="container">
+      <div className="section-heading"><span className="section-kicker">PHOTO ALBUMS</span><h2>Campaign photograph albums</h2><p>Photographs are organised into albums so the library can grow without becoming difficult to browse.</p></div>
+      <label className="album-search"><span>Search albums and photographs</span><div><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search event, ward, caption or album…"/></div></label>
+      {loading?<div className="public-empty">Loading campaign albums…</div>:albums.length===0?<div className="public-empty"><ImageIcon/><h3>No matching photographs</h3><p>Try another search term.</p></div>:<div className="album-grid multi-album-grid">{albums.map(album=><AlbumViewer key={album.title} items={album.items} title={album.title} description={`${album.items.length} campaign photograph${album.items.length===1?'':'s'}`}/>)}</div>}
+      <div className="album-candidate-banner"><CandidateReminder content={content}/><p>Learn more about Prof. Philip Kaloki’s 2027 Makueni County gubernatorial campaign and development agenda while browsing the campaign archive.</p></div>
+    </div></section>
+    {resources.length>0&&<section className="section resources-section"><div className="container"><div className="section-heading"><span className="section-kicker">RESOURCES</span><h2>Videos & documents</h2></div><div className="media-resource-grid">{resources.map(item=><article key={item.id}><FileText/><div><strong>{item.title||'Campaign resource'}</strong>{item.description&&<p>{item.description}</p>}<a href={item.file_url} target="_blank" rel="noreferrer">Open resource →</a></div></article>)}</div></div></section>}
   </main>
 }
 function ContactPage({ content }: { content: Content }) {
@@ -1076,7 +1071,7 @@ function updateSeo(path: string, content: Content) {
   if(canonical) canonical.href=window.location.origin+path
 }
 
-type AdminTab = 'dashboard'|'inbox'|'content'|'news'|'events'|'media'|'images'|'social'|'audit'|'messages'
+type AdminTab = 'dashboard'|'inbox'|'content'|'news'|'events'|'media'|'images'|'social'|'audit'|'messages'|'reports'
 type CmsRow = Record<string, any> & { id: string }
 
 
@@ -1659,7 +1654,7 @@ function AdminPage({ content, setContent }: { content: Content; setContent: Reac
 
   if(!logged) return <section className="admin-shell"><div className="admin-login"><LockKeyhole/><h1>Campaign Admin</h1><p>Secure content management for the Philip Kaloki campaign website.</p><form onSubmit={login}><input type="password" value={key} onChange={e=>setKey(e.target.value)} placeholder="Admin key"/><button className="btn primary">Sign in</button></form>{message&&<div className="form-error">{message}</div>}<a href="/">← Back to website</a></div></section>
 
-  const title={dashboard:'Command Dashboard',inbox:'Submission Inbox',content:'Official Website Content',news:'Newsroom Manager',events:'Events Manager',media:'Media Library',images:'Homepage Images',social:'Social Media',audit:'Audit Trail',messages:'Messages'}[tab]
+  const title={dashboard:'Command Dashboard',inbox:'Submission Inbox',content:'Official Website Content',news:'Newsroom Manager',events:'Events Manager',media:'Media Library',images:'Homepage Images',social:'Social Media',audit:'Audit Trail',messages:'Messages',reports:'Reports & Analysis'}[tab]
   const statCards=[
     {label:'Contacts',value:stats.contact_submissions||0,icon:<Mail/>,tab:'inbox' as AdminTab},
     {label:'Volunteers',value:stats.volunteer_submissions||0,icon:<Users/>,tab:'inbox' as AdminTab},
@@ -1681,7 +1676,7 @@ function AdminPage({ content, setContent }: { content: Content; setContent: Reac
     <button type="button" className={tab==='media'?'active':''} onClick={()=>changeTab('media')}><ImageIcon/> Media</button>
     <button type="button" className={tab==='images'?'active':''} onClick={()=>changeTab('images')}><ImageIcon/> Homepage images</button>
     <button type="button" className={tab==='social'?'active':''} onClick={()=>changeTab('social')}><Share2/> Social media</button>
-    <button type="button" className={tab==='audit'?'active':''} onClick={()=>changeTab('audit')}><Activity/> Audit log</button>
+    <button type="button" className={tab==='reports'?'active':''} onClick={()=>changeTab('reports')}><BarChart3/> Reports & analysis</button><button type="button" className={tab==='audit'?'active':''} onClick={()=>changeTab('audit')}><Activity/> Audit log</button>
     <a href="/"><Eye/> View website</a><button type="button" onClick={()=>{sessionStorage.removeItem('pk-admin-key');location.reload()}}><LogOut/> Sign out</button></aside>
     <div className="admin-main"><div className="admin-top"><div><span>CAMPAIGN SECRETARIAT</span><h1>{title}</h1></div><button type="button" className="admin-refresh" onClick={()=>changeTab(tab)}><RefreshCw/> Refresh</button></div>{message&&<div className="admin-message">{message}</div>}
     {tab==='dashboard'&&<><div className="cms-stat-grid">{statCards.map(card=><button type="button" className="dashboard-stat" key={card.label} onClick={()=>changeTab(card.tab)}><span>{card.icon}</span><strong>{String(card.value)}</strong><small>{card.label}</small></button>)}</div><div className="cms-welcome"><Database/><div><h2>Supabase CMS connected</h2><p>Website content, enquiries, volunteer records, news, events, media records and audit activity are managed from one production database.</p></div></div></>}
@@ -1692,6 +1687,7 @@ function AdminPage({ content, setContent }: { content: Content; setContent: Reac
     {tab==='events'&&<CmsManager kind="events" rows={cmsRows} busy={busy} onSave={saveCms} onDelete={deleteCms} adminKey={key}/>}
     {tab==='media'&&<CmsManager kind="media" rows={cmsRows} busy={busy} onSave={saveCms} onDelete={deleteCms} adminKey={key}/>}
     {tab==='images'&&<SiteImagesManager content={content} setContent={setContent} adminKey={key}/>}
+    {tab==='reports'&&<AdminReports adminKey={key}/>}
     {tab==='social'&&<SocialMediaManager content={content} setContent={setContent} adminKey={key}/>}
     {tab==='audit'&&<div className="audit-list">{cmsRows.map(r=><article key={r.id}><Activity/><div><strong>{String(r.action||'Activity')}</strong><span>{String(r.entity_type||'system')} {r.entity_id?`• ${r.entity_id}`:''}</span><small>{r.created_at?new Date(r.created_at).toLocaleString():''}</small></div></article>)}</div>}
     </div></section>
@@ -1830,6 +1826,17 @@ function MediaBatchUploader({adminKey,onDone}:{adminKey:string;onDone?:()=>void}
   </section>
 }
 
+function AdminReports({adminKey}:{adminKey:string}) {
+  const [data,setData]=React.useState<any>(null)
+  const [error,setError]=React.useState('')
+  const load=React.useCallback(async()=>{setError('');const r=await fetch('/api/admin/reports',{headers:{'x-admin-key':adminKey}});if(!r.ok){setError('Unable to generate reports.');return}setData(await r.json())},[adminKey])
+  React.useEffect(()=>{load()},[load])
+  const exportContacts=()=>{if(!data?.contacts?.length)return;const esc=(v:any)=>`"${String(v??'').replace(/"/g,'""')}"`;const csv=['Name,Phone,Email,Ward,Type,Interest',...data.contacts.map((x:any)=>[x.name,x.phone,x.email,x.ward,x.type,x.interest].map(esc).join(','))].join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=`campaign-records-${new Date().toISOString().slice(0,10)}.csv`;a.click();URL.revokeObjectURL(a.href)}
+  if(error)return <div className="form-error">{error}<button onClick={load}>Retry</button></div>
+  if(!data)return <div className="public-empty">Generating campaign report…</div>
+  return <div className="admin-reports"><div className="report-toolbar"><div><h2>Interaction, records & system analysis</h2><p>Generated {new Date(data.generated_at).toLocaleString()}</p></div><div><button onClick={load}><RefreshCw/> Refresh</button><button onClick={exportContacts}><Download/> Export records CSV</button></div></div><div className="report-kpis">{Object.entries(data.totals||{}).map(([k,v])=><article key={k}><strong>{String(v)}</strong><span>{k.replace(/_/g,' ')}</span></article>)}</div><div className="report-grid"><section><h3>Top wards</h3>{(data.top_wards||[]).map((x:any)=><div className="report-row" key={x.label}><span>{x.label}</span><strong>{x.count}</strong></div>)}</section><section><h3>Volunteer interests</h3>{(data.top_interests||[]).map((x:any)=><div className="report-row" key={x.label}><span>{x.label}</span><strong>{x.count}</strong></div>)}</section><section><h3>Website interactions</h3>{(data.interactions||[]).map((x:any)=><div className="report-row" key={x.event_type}><span>{x.event_type}</span><strong>{x.count}</strong></div>)}</section></div><section className="report-records"><h3>Contact & volunteer records</h3><p>{data.contacts?.length||0} usable contact records. Use Export records CSV for record keeping.</p></section><section className="report-records"><h3>Ideas, improvements & suggestions</h3>{(data.suggestions||[]).length?(data.suggestions||[]).slice(0,30).map((x:any,i:number)=><article key={i}><strong>{x.name||'Website visitor'} {x.ward?`• ${x.ward}`:''}</strong><p>{x.text}</p></article>):<p>No suggestions recorded yet.</p>}</section></div>
+}
+
 function CmsManager({
   kind,
   rows,
@@ -1943,7 +1950,7 @@ function CmsManager({
               Summary
               <textarea name="summary" rows={3} defaultValue={editing?.summary || ''}/>
             </label>
-            <label>
+            <label>Official social media post URL<input name="social_url" type="url" placeholder="https://facebook.com/... or https://x.com/..." defaultValue={editing?.social_url || ''}/></label><label>Live stream / video URL<input name="live_url" type="url" placeholder="YouTube, Facebook Live, X, TikTok…" defaultValue={editing?.live_url || ''}/></label><label>
               Full article
               <textarea name="body" rows={7} defaultValue={editing?.body || ''}/>
             </label>
@@ -1996,7 +2003,7 @@ function CmsManager({
                 }
               />
             </label>
-            <label>
+            <label>Official social media post URL<input name="social_url" type="url" placeholder="https://facebook.com/... or https://x.com/..." defaultValue={editing?.social_url || ''}/></label><label>Live stream / video URL<input name="live_url" type="url" placeholder="YouTube, Facebook Live, X, TikTok…" defaultValue={editing?.live_url || ''}/></label><label>
               Description
               <textarea name="description" rows={5} defaultValue={editing?.description || ''}/>
             </label>
@@ -2025,7 +2032,7 @@ function CmsManager({
               Title
               <input name="title" required defaultValue={editing?.title || ''}/>
             </label>
-            <label>
+            <label>Album name<input name="album_name" placeholder="e.g. Kilome Community Forum" defaultValue={editing?.album_name || ''}/></label><label>
               Type
               <select name="asset_type" defaultValue={editing?.asset_type || 'photo'}>
                 <option value="photo">Photo</option>

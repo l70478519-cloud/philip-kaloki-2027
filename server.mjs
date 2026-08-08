@@ -806,12 +806,12 @@ app.get('/api/media-gallery',async(_req,res)=>{
   try{
     const [mediaR,eventR]=await Promise.all([
       supabase.from('media_assets')
-        .select('id,file_url,thumbnail_url,title,description,asset_type,created_at')
+        .select('id,file_url,thumbnail_url,title,description,asset_type,album_name,created_at')
         .eq('published',true)
         .eq('asset_type','photo')
         .order('created_at',{ascending:false}),
       supabase.from('event_images')
-        .select('id,image_url,caption,created_at')
+        .select('id,event_id,image_url,caption,created_at')
         .order('created_at',{ascending:false})
     ])
 
@@ -827,6 +827,7 @@ app.get('/api/media-gallery',async(_req,res)=>{
         image_url:x.thumbnail_url||x.file_url,
         caption:clean(x.title)||'Campaign photograph',
         description:x.description||'',
+        album_name:x.album_name||'Campaign moments',
         source:'media',
         created_at:x.created_at
       })),
@@ -835,6 +836,7 @@ app.get('/api/media-gallery',async(_req,res)=>{
         image_url:x.image_url,
         caption:clean(x.caption)||'Campaign event',
         description:'',
+        album_name:'Campaign events',
         source:'event',
         created_at:x.created_at
       }))
